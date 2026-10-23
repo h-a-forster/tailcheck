@@ -125,5 +125,12 @@ Done:
   matching arch to 1e-8, `caviar-sav`) and `rolling_forecast` driver; no-look-ahead test
   per model. ESR backtest returns nan when the ES covariance is not positive definite.
 
-Next: M7 data + study forecast stage, M8 Monte Carlo, M9 study report,
+- M7: `data` (Binance zips verified against .CHECKSUM, ms/us timestamp detection, FRED
+  CSV snapshot cache, processed returns + SHA-256 manifest in
+  `results/study-v1/data_manifest.json`), `study.runner` (forecast/backtest/compare units
+  through UnitStore), `study.report` (CSV + markdown tables, Holm/BH), CLI (`backtest`,
+  `data fetch`, `study run|report`, `mc run|report`), `multiple` (Holm, BH).
+  Timings: forecast units 3-60 s each (CAViaR slowest), backtest unit about 25 s.
+
+Next: M7 real run data + study forecast stage, M8 Monte Carlo, M9 study report,
 M10 CLI/README. Follow DESIGN section 9.

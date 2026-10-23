@@ -1,0 +1,42 @@
+{
+  "BTCUSDT": {
+    "class": "crypto",
+    "first": "2017-08-18",
+    "last": "2026-09-30",
+    "n_returns": 3331,
+    "sha256": "ea68e1ef077cc16e722dc3e3f5aa15cdc22eb5e6e84355988b0c9349a3409d63",
+    "source": "binance"
+  },
+  "ETHUSDT": {
+    "class": "crypto",
+    "first": "2017-08-18",
+    "last": "2026-09-30",
+    "n_returns": 3331,
+    "sha256": "f673ed8947352426e7f659c67b079e800d0566bdb0ab39bc096af5ed050c9853",
+    "source": "binance"
+  },
+  "NASDAQCOM": {
+    "class": "equity",
+    "first": "1971-02-08",
+    "last": "2026-09-30",
+    "n_returns": 14030,
+    "sha256": "2a02b3bd68c7631b7c9bde570b499e326bde4993d6b8c75ef985e955b0ab5901",
+    "source": "fred"
+  },
+  "NIKKEI225": {
+    "class": "equity",
+    "first": "1949-05-17",
+    "last": "2026-09-30",
+    "n_returns": 19208,
+    "sha256": "4548b5d1575c4c6bf9c2d6f3108fa884d3acde7344fce27d78401f43c432c16d",
+    "source": "fred"
+  },
+  "SP500": {
+    "class": "equity",
+    "first": "2016-10-25",
+    "last": "2026-09-30",
+    "n_returns": 2496,
+    "sha256": "a365b5470d7a2a4da8ed0ba1f14daaab2061c884e1f2059937fc9ed63e951644",
+    "source": "fred"
+  }
+}
