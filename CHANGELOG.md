@@ -36,6 +36,29 @@ First feature-complete version. Not tagged and not on PyPI.
   webR (`scripts/r_fixtures/`), committed as JSON; the tests never need R.
 - `REPORT.md` with the quick-profile study and Monte Carlo results.
 
+### Fixed (pre-release audit)
+
+- Worker processes really run with one BLAS thread: the thread variables are set in the
+  parent while the pool runs and `threadpoolctl` limits the live pools (before, OpenBLAS
+  kept its full pool in every worker). Adds the `threadpoolctl` dependency.
+- Resume safety: run manifests record the input-data SHA-256s and package version, and a
+  resume on different inputs is refused; a changed source hash warns. The study's compare
+  unit waits for every configured forecaster, so a forecaster that only succeeds on a rerun
+  is no longer left out of the MCS/DM results.
+- `study report` / `mc report` open the run read-only and write nothing when there is no
+  finished run (before, they truncated `results/<name>/*.csv` and crashed).
+- `bandwidth_sj` uses O(n) memory (blocked pair differences, identical results) and bins
+  the data above n = 10,000 (before, O(n^2) memory, about 8 GB at n = 20,000).
+- Downloads are written atomically; malformed Binance checksum files are refetched and a
+  mismatch is retried once; non-finite prices are rejected; FRED CSVs are validated before
+  caching.
+- CLI: bad input gives `error: ...` and exit code 2 instead of a traceback; unknown
+  `--stages` values are rejected; `[run] workers` is the default for `--workers`.
+- Monte Carlo: the Acerbi-Szekely null sample is drawn per chunk instead of once per cell;
+  the size-distortion band follows `level`; the `slow-vol` DGP is renamed `unconditional`
+  (it is constant-sigma forecasts on the GARCH data). Ignored config keys removed.
+- Study and quick Monte Carlo regenerated with the fixed code (`REPORT.md`).
+
 ### Found
 
 - `esreg` 0.6.2 returns `-1/z^3` for the second derivative of G2 type 1 (correct: `-2/z^3`).

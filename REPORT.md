@@ -10,13 +10,18 @@ those files; the commands that rebuild them are at the end.
   discrepancy (a wrong second derivative, `-1/z^3` instead of `-2/z^3`) changes strict-ESR
   p-values materially: by up to 0.25 on the reference fixtures and by up to 0.76 (median
   0.03) across the 50 study cells. tailcheck uses the correct formula.
-- Monte Carlo (231 cells, 296,280 replications): Kupiec and both Acerbi-Szekely
-  statistics keep their 5% size in every cell except Kupiec at n = 250, alpha = 1%
-  (8.6% and 10.1%, binomial discreteness). The dynamic quantile test is oversized at 1%
-  (9-11%), Christoffersen independence is undersized everywhere (0.8-2.5%), and McNeil-Frey
-  is undersized at n = 250 (1.2-1.7%). The strict ESR test rejects 5.5-8% of
-  200 null replications per cell (every Wilson interval reaches 5%); the one-sided ESR v3 test is
-  conservative (0-1%).
+- Monte Carlo (231 cells, 296,280 replications). Acerbi-Szekely Z2 has a Wilson interval
+  covering 5% in all 12 size cells, Z1 in 10 of 12 (4.0% and 6.1% in the other two, both at
+  alpha = 1%; about 0.6 such cells per test are expected by chance). Kupiec is oversized at
+  n = 250 (8.6% and 10.1% at alpha = 1%, 7.3% at 2.5%; binomial discreteness); at
+  alpha = 1% two larger-n `iid-t5` cells also miss 5% narrowly (6.1% at n = 1000, 3.8% at
+  n = 2000), and its other 6 cells cover 5%. The dynamic quantile test is oversized at
+  1% (9-11%), Christoffersen independence is undersized everywhere (0.8-2.5%), and
+  McNeil-Frey is below 5% in every size cell (1.2-4.3%), clearly so at n = 250 and at
+  n = 1000, alpha = 1% (1.2-2.9%). The strict ESR test rejects 5.5-8% of 200 null
+  replications per cell (every Wilson interval reaches 5%); the one-sided ESR v3 test is
+  conservative (0-1%), mainly through a small positive finite-sample bias of the ES
+  intercept and an inflated standard error (section 3).
 - In the study (5 assets x 5 forecasters x 2 levels, out of sample 2021-01 to 2026-09), 11 of
   50 strict ESR tests reject at 5% before adjustment, 6 after Benjamini-Hochberg and 4 after
   Holm. All 6 BH rejections come with exceedance rates below the nominal level and one-sided
@@ -30,11 +35,25 @@ those files; the commands that rebuild them are at the end.
 
 | Item | Value |
 |---|---|
-| Code | commit `c08d4f3` for the study (the next commit only speeds up the Sheather-Jones bandwidth, changing it by about 1e-5 relative); commit `d097f0f` for the Monte Carlo |
+| Code | commit `d6a4d86` for both the study and the Monte Carlo (regenerated after the pre-release audit fixes; see the note below) |
 | Software | Python 3.13.1, numpy 2.5.4, scipy 1.18.1, pandas 3.1.0, arch 8.0.0; Windows 11, CPU only, 4 worker processes |
-| Study config | `configs/study.toml` (hash `8a7e477162200e84`), seed 20261023 |
+| Study config | `configs/study.toml` (hash `b5e6bab664e5e3e2`), seed 20261023 |
 | Monte Carlo config | `configs/mc_quick.toml`, seed 20261023 |
 | R references | `esreg` 0.6.2, `esback` 0.3.1, `quantreg` 6.1 on R 4.6.0 (webR 0.6.0) |
+
+**Earlier versions of these results.** The first published numbers came from commit
+`c08d4f3` (study) and `d097f0f` (Monte Carlo). Commit `d097f0f` did not only speed up the
+Sheather-Jones bandwidth: it also wrote the FZ0 estimator objective out explicitly. That is
+the same loss, but it changes Nelder-Mead paths, and the location-scale covariance step is
+numerically sensitive, so the old study ESR p-values were not exactly reproducible at later
+commits. The regenerated study differs from the `c08d4f3` run only in the ESR p-values: the
+largest change is NASDAQCOM `hs` at 1% (strict ESR p 5.8e-5 -> 3.7e-5, 35%), then SP500 `hs`
+at 1% (0.0010 -> 0.0007, 29%) and NIKKEI225 `hs` at 1% (0.526 -> 0.508, 3.5%); every other
+cell moved by less than 0.3% (strict ESR; up to 22% for one auxiliary-ESR p-value), and no
+rejection count changes. The regenerated Monte Carlo reproduces every
+ESR rate exactly; the Acerbi-Szekely rates change by up to 3 percentage points because the
+null sample is now drawn per chunk (section 3), and the renamed `unconditional` power DGP
+has new seeds.
 
 **Data** (`results/study-v1/data_manifest.json` holds the SHA-256 of each processed return
 series). Daily percent log returns: BTCUSDT and ETHUSDT from Binance spot daily klines (UTC
@@ -51,9 +70,11 @@ same fit, with a GPD on the worst 10% of standardized residuals (`evt-pot`); and
 with ES as a constant multiple of VaR (`caviar-sav`). Acerbi-Szekely uses 2,000 predictive
 draws per day; it is not available for CAViaR, which has no predictive distribution.
 
-**Compute.** About 16 minutes of wall time: 13 CPU-minutes of forecasting (CAViaR 10 of
-them), 43 of backtests and 2 of model confidence sets, 57 CPU-minutes in total against a plan
-of 45. No unit failed and no strict ESR test was undefined.
+**Compute.** 4.4 minutes of wall time: 6.6 CPU-minutes of forecasting (CAViaR 5.4 of
+them), 8.3 of backtests and 1.0 of model confidence sets, 15.9 CPU-minutes in total against a
+plan of 45. No unit failed and no strict ESR test was undefined. The first run took 16
+minutes and 57 CPU-minutes because every worker process still ran a 16-thread OpenBLAS pool
+(4 workers on a shared CPU); fixing the per-worker thread limit roughly tripled throughput.
 
 ## 2. Validation of the implementation
 
@@ -99,20 +120,30 @@ Details: `docs/esreg-covariance.md`.
 
 ## 3. Monte Carlo size and power
 
-Configuration `configs/mc_quick.toml` (hash `e2a5d2f1aeea242b`, seed 20261023); full
+Configuration `configs/mc_quick.toml` (hash `c7b1a7514ee396dd`, seed 20261023); full
 table with Wilson 95% intervals in `results/mc-quick/size_power.md`, raw rates in
-`size_power.csv`. Run time 22.5 minutes of wall time, 87.5 CPU-minutes (ESR 81, everything
-else 7) against a calibrated projection of 124 (`results/mc-quick/calibration.json`). No
-unit failed. Size and power are rejection rates at the 5% level; a test that is undefined
+`size_power.csv`. Run time 11.6 minutes of wall time, 45.4 CPU-minutes (ESR 41, everything
+else 4.4; the first run, with oversubscribed BLAS threads, took 22.5 and 87.5) against a
+calibrated projection of 124 (`results/mc-quick/calibration.json`). No unit failed. Size and power are rejection rates at the 5% level; a test that is undefined
 in a replication (for example no exceedances) counts as a non-rejection, and the number of
 such replications is reported.
 
 **DGPs** (DESIGN section 6). Size: returns from a GARCH(1,1) with standardized t5
 innovations (`garch-t5`) or iid t5 (`iid-t5`), with the true VaR/ES as forecasts. Power: the
 true forecasts scaled by 0.85 (`scale-0.85`, risk understated); normal-quantile forecasts
-for t5 data with the right volatility (`normal-tails`, tail shape wrong); constant forecasts
-for data with slowly varying volatility (`slow-vol`, no conditioning). VaR and ES tests use
-2,000 null replications per size cell and 1,000 per power cell; the ESR tests 200 and 40.
+for t5 data with the right volatility (`normal-tails`, tail shape wrong); unconditional
+constant-sigma t5 forecasts on the same GARCH(1,1) data (alpha 0.10, beta 0.85, volatility
+half-life about 13.5 days; `unconditional`, no conditioning, called `slow-vol` in the first
+run). VaR and ES tests use 2,000 null replications per size cell and 1,000 per power cell;
+the ESR tests 200 and 40.
+
+**Acerbi-Szekely null.** The null distribution of Z1/Z2 is simulated with 2,000 paths. It is
+drawn afresh for each chunk of 50 replications, so its Monte Carlo error is shared within a
+chunk only and averages out over the 40 chunks of a size cell. In the first run one null
+sample served a whole cell, which could shift that cell's true size by about +-0.5
+percentage points (1 sd), an error the Wilson interval did not include. The Wilson
+intervals still treat replications as independent, so they remain very slightly too
+narrow for the Acerbi-Szekely rows.
 
 **Size** (rejection rate of a true model; selected cells, `garch-t5`):
 
@@ -122,20 +153,25 @@ for data with slowly varying volatility (`slow-vol`, no conditioning). VaR and E
 | Christoffersen ind | 0.015 | 0.008 | 0.013 | 0.021 | 0.025 |
 | Christoffersen cc | 0.005 | 0.023 | 0.040 | 0.034 | 0.042 |
 | DQ | 0.091 | 0.079 | 0.060 | 0.089 | 0.058 |
-| Acerbi-Szekely Z1 | 0.045 (149 undefined) | 0.059 | 0.054 | 0.051 | 0.040 |
-| Acerbi-Szekely Z2 | 0.055 | 0.050 | 0.043 | 0.050 | 0.051 |
+| Acerbi-Szekely Z1 | 0.045 (149 undefined) | 0.055 (4) | 0.051 | 0.053 | 0.046 |
+| Acerbi-Szekely Z2 | 0.052 | 0.051 | 0.048 | 0.049 | 0.050 |
 | McNeil-Frey | 0.012 (1049 undefined) | 0.017 (95) | 0.036 | 0.035 | 0.039 |
 | strict ESR (v1) | | | 0.080 [0.050, 0.126] | 0.055 [0.031, 0.096] | 0.080 [0.050, 0.126] |
 | strict ESR, esback G2'' | | | 0.090 [0.058, 0.138] | 0.060 [0.035, 0.102] | 0.065 [0.038, 0.108] |
 | ESR v3 (one-sided) | | | 0.000 [0, 0.019] | 0.000 [0, 0.019] | 0.010 [0.003, 0.036] |
 
 Wilson half-widths are about 0.01 for the VaR/ES tests and 0.03-0.04 for the ESR tests.
-The `iid-t5` cells look the same (Kupiec 10.1% at n = 250, 1%; DQ 9.2-11.1% at 1%).
+The `iid-t5` cells look the same (Kupiec 10.1% at n = 250, 1%, 7.3% at n = 250, 2.5% and
+6.1% at n = 1000, 1%; DQ 9.2-11.1% at 1%).
 
 - **Distorted cells.** 29 of the 93 size cells have a Wilson interval entirely outside
   [3%, 7%]: Christoffersen independence (11 of 12 cells, all undersized) and conditional
   coverage at 1% with n <= 1000 (3), DQ at 1% (6, oversized at 9-11%), Kupiec at n = 250,
-  1% (2), McNeil-Frey at small n (5, undersized) and ESR v3 (2). These are properties of the
+  1% (2), McNeil-Frey at n = 250 and at `garch-t5`, n = 1000, 1% (5, undersized) and ESR v3
+  (2). This [3%, 7%] rule is lenient: a stricter reading (interval excludes 5%) also flags
+  Kupiec at n = 250, 2.5% (7.3% in both DGPs) and at `iid-t5`, alpha = 1%, n = 1000 and 2000
+  (6.1%, 3.8%), Z1 at alpha = 1% in two cells (4.0%, 6.1%), and every McNeil-Frey cell except
+  `iid-t5`, n = 2000, 2.5%. These are properties of the
   tests with few exceedances (the Christoffersen and DQ distortions with rare hits are
   known from the literature), not implementation failures; the closed-form checks in
   section 2 pin down the statistics themselves.
@@ -143,21 +179,33 @@ The `iid-t5` cells look the same (Kupiec 10.1% at n = 250, 1%; DQ 9.2-11.1% at 1
   cannot distinguish 5% from 8%. The esback G2'' variant has a similar size: the
   discrepancy changes individual p-values (section 2.2) more than the rejection rate.
 - **ESR v3** is conservative: under the null the 5% quantile of its p-value is 0.10-0.18
-  and its median 0.56-0.65, so the statistic is shifted towards "too conservative". We have
-  not established whether `esback`'s asymptotic v3 behaves the same way under this DGP; the
-  R comparison checks p-values on fixed forecast sets, not their null distribution. The
-  bootstrap versions (not run here) may behave differently.
+  and its median 0.56-0.65. A separate null study (`scripts/esr_v3_null_se.py`, 200
+  replications of `garch-t5`, n = 1000, alpha = 2.5%; `results/mc-quick/esr_v3_null_se.json`)
+  shows two causes. (i) The ES intercept has a small positive finite-sample bias (mean 0.021,
+  median 0.041, against a standard deviation of 0.231), which pushes the t-statistic towards
+  "too conservative" (mean t about +0.3). (ii) The default covariance (nid sparsity,
+  `scl_sp`, misspecification terms) overstates the intercept's standard error on average
+  (mean 0.267, median 0.227, against the empirical 0.231), with a long right tail. Dropping
+  the misspecification terms gives a mean SE of 0.214 but rejects only 2.0% (t mean 0.40,
+  sd 1.23); the default rejects 1.5% in this study (0 of 200 in the Monte Carlo cell, within
+  sampling error); `scl_N` without the misspecification terms understates the SE (0.159)
+  and rejects 7%. So the misspecification terms explain part, not all, of the
+  conservativeness. tailcheck reproduces `esback`'s v3 p-values on the R fixtures (within
+  0.006 once esreg's G2'' is reproduced), so `esback`'s asymptotic v3 with its default
+  covariance very likely behaves the same way. For a v3 test with closer to nominal size,
+  the bootstrap (implemented, not run here) is the candidate; its size has not been
+  checked.
 
 **Power** (rejection rate of a wrong model; selected cells):
 
-| test | scale-0.85, n=1000, 2.5% | scale-0.85, n=2000, 2.5% | normal-tails, n=1000, 2.5% | normal-tails, n=2000, 2.5% | slow-vol, n=1000, 2.5% |
+| test | scale-0.85, n=1000, 2.5% | scale-0.85, n=2000, 2.5% | normal-tails, n=1000, 2.5% | normal-tails, n=2000, 2.5% | unconditional, n=1000, 2.5% |
 |---|---|---|---|---|---|
-| Kupiec | 0.75 | 0.96 | 0.05 | 0.05 | 0.24 |
-| Christoffersen cc | 0.72 | 0.94 | 0.04 | 0.06 | 0.33 |
-| DQ | 0.66 | 0.91 | 0.07 | 0.09 | 0.55 |
-| Acerbi-Szekely Z1 | 0.08 | 0.10 | 0.94 | 1.00 | 0.19 |
-| Acerbi-Szekely Z2 | 0.85 | 0.98 | 0.29 | 0.43 | 0.18 |
-| McNeil-Frey | 0.13 | 0.19 | 0.87 | 0.99 | 0.18 |
+| Kupiec | 0.75 | 0.96 | 0.05 | 0.05 | 0.22 |
+| Christoffersen cc | 0.72 | 0.94 | 0.04 | 0.06 | 0.34 |
+| DQ | 0.66 | 0.91 | 0.07 | 0.09 | 0.56 |
+| Acerbi-Szekely Z1 | 0.08 | 0.12 | 0.93 | 1.00 | 0.17 |
+| Acerbi-Szekely Z2 | 0.86 | 0.98 | 0.29 | 0.40 | 0.17 |
+| McNeil-Frey | 0.13 | 0.19 | 0.87 | 0.99 | 0.16 |
 | strict ESR (v1) | 0.20 | 0.45 | 0.15 | 0.53 | |
 | ESR v3 | 0.40 | 0.73 | 0.30 | 0.63 | |
 
@@ -185,10 +233,10 @@ alpha = 1%:
 | model | BTCUSDT | ETHUSDT | NASDAQCOM | NIKKEI225 | SP500 |
 |---|---|---|---|---|---|
 | caviar-sav | 0.030 [0.172] | 0.150 [0.357] | 0.620 [0.719] | 0.322 [0.505] | 0.793 [0.826] |
-| evt-pot | 0.009 [0.063] | 0.520 [0.642] | 0.170 [0.386] | 0.314 [0.505] | 0.843 [0.848] |
-| fhs | 0.005 [0.044] | 0.354 [0.506] | 0.213 [0.463] | 0.413 [0.568] | 0.848 [0.848] |
+| evt-pot | 0.009 [0.063] | 0.520 [0.640] | 0.170 [0.386] | 0.314 [0.505] | 0.843 [0.848] |
+| fhs | 0.005 [0.043] | 0.354 [0.506] | 0.213 [0.463] | 0.413 [0.568] | 0.848 [0.848] |
 | gjr-t | 0.066 [0.235] | 0.307 [0.505] | 0.344 [0.505] | 0.265 [0.505] | 0.233 [0.465] |
-| hs | 0.005 [0.044] | 0.119 [0.313] | 6e-05 [0.001] | 0.526 [0.642] | 0.001 [0.012] |
+| hs | 0.005 [0.043] | 0.119 [0.313] | 4e-05 [9e-04] | 0.508 [0.640] | 7e-04 [0.011] |
 
 alpha = 2.5%:
 
@@ -196,9 +244,9 @@ alpha = 2.5%:
 |---|---|---|---|---|---|
 | caviar-sav | 0.038 [0.175] | 0.736 [0.783] | 0.327 [0.505] | 0.064 [0.235] | 0.288 [0.505] |
 | evt-pot | 0.093 [0.299] | 0.647 [0.719] | 0.106 [0.299] | 0.480 [0.632] | 0.642 [0.719] |
-| fhs | 0.108 [0.299] | 0.678 [0.737] | 0.101 [0.299] | 0.525 [0.642] | 0.647 [0.719] |
+| fhs | 0.108 [0.299] | 0.678 [0.737] | 0.101 [0.299] | 0.525 [0.640] | 0.647 [0.719] |
 | gjr-t | 0.341 [0.505] | 0.420 [0.568] | 0.038 [0.175] | 0.126 [0.314] | 0.058 [0.235] |
-| hs | 0.031 [0.172] | 0.230 [0.465] | 9e-04 [0.012] | 0.326 [0.505] | 3e-09 [2e-07] |
+| hs | 0.031 [0.172] | 0.230 [0.465] | 9e-04 [0.011] | 0.326 [0.505] | 3e-09 [2e-07] |
 
 Rejections at 5%: 11 raw, 6 BH, 4 Holm. The six BH rejections:
 
@@ -206,8 +254,8 @@ Rejections at 5%: 11 raw, 6 BH, 4 Holm. The six BH rejections:
 |---|---|---|---|---|
 | BTCUSDT fhs 1% | 14 / 2099 | 0.67% | 0.0048 | 0.94 |
 | BTCUSDT hs 1% | 13 / 2099 | 0.62% | 0.0052 | 0.97 |
-| NASDAQCOM hs 1% | 9 / 1442 | 0.62% | 6e-5 | 1.00 |
-| SP500 hs 1% | 6 / 1442 | 0.42% | 0.0010 | 1.00 |
+| NASDAQCOM hs 1% | 9 / 1442 | 0.62% | 4e-5 | 1.00 |
+| SP500 hs 1% | 6 / 1442 | 0.42% | 0.0007 | 1.00 |
 | NASDAQCOM hs 2.5% | 26 / 1442 | 1.80% | 0.0009 | 1.00 |
 | SP500 hs 2.5% | 20 / 1442 | 1.39% | 3e-9 | 1.00 |
 
@@ -294,9 +342,13 @@ Per-regime tests (Kupiec, strict ESR, ESR v3, FZ0, Acerbi-Szekely) are in
 - **R comparison** covers `esreg` and `esback` only. No R oracle was available for the VaR
   tests or Acerbi-Szekely (`rugarch` and `GAS` do not run in webR); those rely on
   closed-form and published values.
-- **Budget.** The quick runs took longer than planned (57 instead of 45 CPU-minutes for the
-  study; see section 3 for the Monte Carlo), mainly because an ESR fit with the default
-  covariance takes 2-4 s at n = 2000.
+- **Budget.** The study now fits its 45 CPU-minute plan (15.9). The Monte Carlo needed
+  cuts to the ESR replication counts at calibration time, when an ESR fit with the default
+  covariance took 2-4 s at n = 2000 (partly BLAS oversubscription, since fixed); see
+  section 3.
+- **Full-size profiles** are projected, not measured: about 20-30 CPU-hours for
+  `configs/study_full.toml` (dominated by the ESR bootstrap, about 0.45 s per replicate) and
+  35-45 for `configs/mc_full.toml` (see the config headers).
 
 ## 6. Reproduce
 

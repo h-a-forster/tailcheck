@@ -206,18 +206,22 @@
       "rate": 0.0155
     }
   ],
-  "config_hash": "e2a5d2f1aeea242b",
+  "config_hash": "c7b1a7514ee396dd",
   "run_manifest": {
-    "config_hash": "e2a5d2f1aeea242b",
+    "config_hash": "c7b1a7514ee396dd",
+    "inputs": {
+      "tailcheck": "0.1.0"
+    },
+    "source_hash": "5924e59fba998ff9",
     "versions": {
       "python": "3.13.1",
       "numpy": "2.5.4",
       "scipy": "1.18.1",
       "pandas": "3.1.0",
       "arch": "8.0.0",
-      "tailcheck": "0.1.0.dev0"
+      "tailcheck": "0.1.0"
     },
-    "started": "2026-10-23T19:25:28+00:00",
+    "started": "2026-10-23T20:37:57+00:00",
     "platform": "win32"
   }
 }

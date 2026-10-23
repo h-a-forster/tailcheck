@@ -685,7 +685,7 @@ Recorded when the plan above and the code differ:
 - **FZ0 objective.** Since commit `d097f0f` the estimator evaluates the (G1 = 0,
   G2 = -1/z) loss through a written-out FZ0 expression. It is the same function, but
   floating-point differences change Nelder-Mead paths: p-values move by up to about 50%
-  relative in the most extreme cells (for example 5.8e-5 vs 3.7e-5), because the
+  relative in the most extreme study cells (35%: 5.8e-5 vs 3.7e-5; all other cells under 4%), because the
   location-scale covariance step is numerically sensitive. All committed results were
   regenerated after this change.
 - **`scl_sp` truncated moments.** Closed-form Gaussian-kernel integrals instead of a
@@ -697,7 +697,8 @@ Recorded when the plan above and the code differ:
   from one fit). Section 4.3.1 checks (a)-(c) were done; see `docs/esreg-covariance.md`.
 - **McNeil-Frey vs `er_backtest`.** One-sided p-values differ by up to 0.06 (expected 0.02)
   because the bootstrap centring differs; two-sided conventions differ more.
-- **Budgets.** The quick study used about 57 CPU-minutes (target 45). The quick Monte Carlo
+- **Budgets.** The quick study first used about 57 CPU-minutes (target 45); with the
+  per-worker BLAS thread limit fixed it uses 16. The quick Monte Carlo
   was calibrated at about 124 CPU-minutes after cutting ESR replications to 200 (size) and 40
   (power): an ESR test at n = 2000 takes 3-4 s, not the 1 s estimated
   (`results/mc-quick/calibration.json`).

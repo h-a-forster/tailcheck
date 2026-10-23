@@ -83,14 +83,18 @@ minute).
 
 ```sh
 uv run tailcheck data fetch  --config configs/study.toml
-uv run tailcheck study run   --config configs/study.toml --workers 4      # about 57 CPU-min, 16 min wall
+uv run tailcheck study run   --config configs/study.toml --workers 4      # about 16 CPU-min, 4.5 min wall
 uv run tailcheck study report --config configs/study.toml                 # results/study-v1/ (REPORT.md is written by hand)
-uv run tailcheck mc run      --config configs/mc_quick.toml --workers 4   # about 88 CPU-min, 23 min wall
+uv run tailcheck mc run      --config configs/mc_quick.toml --workers 4   # about 45 CPU-min, 12 min wall
 uv run tailcheck mc report   --config configs/mc_quick.toml
 ```
 
-Full size: `configs/study_full.toml` (daily refits, bootstrap ESR; about 10-20 CPU-hours) and
-`configs/mc_full.toml` (about 15-25 CPU-hours). Both resume from `runs/<name>/units/`. Before a
+Full size: `configs/study_full.toml` (daily refits, bootstrap ESR; projected 20-30
+CPU-hours) and `configs/mc_full.toml` (projected 35-45 CPU-hours); projections, not
+measurements (see the config headers). Both resume from `runs/<name>/units/`. A run directory
+refuses to resume when the config, the processed data or the package version changed (use
+`--force-new` or a new `out_dir`); changed code only warns. Reports are read-only and fail
+cleanly without a finished run. Before a
 long run, validate on a small sample, wrap it in a resume-on-failure loop, and watch
 `runs/<name>/progress.log` for stalls.
 
@@ -133,17 +137,35 @@ Done:
   Timings: forecast units 3-60 s each (CAViaR slowest), backtest unit about 25 s.
 
 - M8: `montecarlo` (DGPs, runner per (cell, chunk), report with Wilson intervals). Quick
-  run done: 231 cells, 296,280 replications, 22.5 min wall / 87.5 CPU-min, 0 failures;
-  results in `results/mc-quick/`. ESR v3 asymptotic is conservative (0-1% at 5%);
-  Christoffersen ind undersized; DQ oversized at 1%.
-- Study quick run done: 50 cells, 16 min wall / 57 CPU-min, 0 failures; results in
-  `results/study-v1/`. Strict ESR rejections 11 raw / 6 BH / 4 Holm (all too conservative).
+  run (regenerated at `d6a4d86`): 231 cells, 296,280 replications, 11.6 min wall / 45.4
+  CPU-min, 0 failures; results in `results/mc-quick/`. ESR v3 asymptotic is conservative
+  (0-1% at 5%; cause analysed with `scripts/esr_v3_null_se.py`); Christoffersen ind
+  undersized; DQ oversized at 1%; McNeil-Frey below 5% everywhere.
+- Study quick run (regenerated at `d6a4d86`): 50 cells, 4.4 min wall / 15.9 CPU-min, 0
+  failures; results in `results/study-v1/`. Strict ESR rejections 11 raw / 6 BH / 4 Holm
+  (all too conservative).
+- Pre-release audit (2026-10-23) fixed: BLAS threads per worker (were 16; now 1, via
+  parent env + threadpoolctl), resume key now covers data hashes and version (code change
+  warns), compare stage waits for all forecasters, read-only reports, O(n)-memory SJ
+  bandwidth, atomic/validated downloads, CLI error handling and `--stages` validation,
+  per-chunk Acerbi-Szekely null in the Monte Carlo, `slow-vol` renamed `unconditional`,
+  ignored config keys removed, README tolerance claims, REPORT wording (Kupiec/MF size,
+  ESR v3 cause, FZ0 objective change in `d097f0f`). Each fix has a test.
 - M9/M10: `REPORT.md`, README (install, quick start, CLI example), CHANGELOG 0.1.0
   (version bumped, not tagged), DESIGN section 12 (implementation notes).
-- Tests: `uv run pytest` 149 passed / 36 skipped; `--runslow` 183 passed / 2 skipped
-  (iid sparsity vs esreg, documented).
+- Tests: see the latest commit message for counts (`uv run pytest`; `--runslow` also
+  runs the slow Monte Carlo and R-fixture checks; 2 documented skips: iid sparsity vs
+  esreg).
 
-Next (not done): full-size profiles (`configs/study_full.toml`, `configs/mc_full.toml`,
-many CPU-hours), ESR bootstrap size study, checking esback's v3 null distribution,
-tagging v0.1.0 and publishing (needs the owner's go-ahead). Re-running anything: resume
+Next (not done):
+- Full-size profiles (`configs/study_full.toml`, `configs/mc_full.toml`; projected 20-30 and
+  35-45 CPU-hours). Re-time a few units first: the projections predate the BLAS fix and
+  may be pessimistic.
+- ESR bootstrap size study (no Monte Carlo runner path yet; would answer whether the
+  bootstrap fixes the conservative v3).
+- Running `esback` itself on simulated null data (webR) to confirm directly that its v3 is
+  conservative; currently inferred from matching p-values on fixtures.
+- Acerbi-Szekely Wilson intervals still treat the replications of a chunk as independent
+  although they share one null sample (documented in REPORT section 3).
+- Tagging v0.1.0 and publishing (needs the owner's go-ahead). Re-running anything: resume
 from `runs/<name>/units/`; delete a run directory only to start over.

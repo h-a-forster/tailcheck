@@ -1,6 +1,6 @@
 {
   "config": "configs\\study.toml",
-  "config_hash": "8a7e477162200e84",
+  "config_hash": "b5e6bab664e5e3e2",
   "seed": 20261023,
   "n_backtest_cells": 50,
   "esr_v1_rejections_5pct": {
@@ -9,19 +9,30 @@
     "bh": 6
   },
   "esr_v1_undefined": 0,
-  "forecast_cpu_seconds": 761.3560944000055,
+  "forecast_cpu_seconds": 396.05386499997985,
   "python": "3.13.1",
   "run_manifest": {
-    "config_hash": "8a7e477162200e84",
+    "config_hash": "b5e6bab664e5e3e2",
+    "inputs": {
+      "tailcheck": "0.1.0",
+      "data_sha256": {
+        "BTCUSDT": "ea68e1ef077cc16e722dc3e3f5aa15cdc22eb5e6e84355988b0c9349a3409d63",
+        "ETHUSDT": "f673ed8947352426e7f659c67b079e800d0566bdb0ab39bc096af5ed050c9853",
+        "SP500": "a365b5470d7a2a4da8ed0ba1f14daaab2061c884e1f2059937fc9ed63e951644",
+        "NASDAQCOM": "2a02b3bd68c7631b7c9bde570b499e326bde4993d6b8c75ef985e955b0ab5901",
+        "NIKKEI225": "4548b5d1575c4c6bf9c2d6f3108fa884d3acde7344fce27d78401f43c432c16d"
+      }
+    },
+    "source_hash": "5924e59fba998ff9",
     "versions": {
       "python": "3.13.1",
       "numpy": "2.5.4",
       "scipy": "1.18.1",
       "pandas": "3.1.0",
       "arch": "8.0.0",
-      "tailcheck": "0.1.0.dev0"
+      "tailcheck": "0.1.0"
     },
-    "started": "2026-10-23T18:57:28+00:00",
+    "started": "2026-10-23T20:33:27+00:00",
     "platform": "win32"
   }
 }
