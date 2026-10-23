@@ -58,7 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
     srep = study_sub.add_parser("report")
     srep.add_argument("--config", type=Path, required=True)
 
-    mc = sub.add_parser("mc", help="Monte Carlo size/power validation: run | report")
+    mc = sub.add_parser("mc", help="Monte Carlo size/power: run | report | boot-run | boot-report")
     mc_sub = mc.add_subparsers(dest="action", required=True)
     mr = mc_sub.add_parser("run")
     mr.add_argument("--config", type=Path, required=True)
@@ -66,6 +66,18 @@ def build_parser() -> argparse.ArgumentParser:
     mr.add_argument("--force-new", action="store_true")
     mrep = mc_sub.add_parser("report")
     mrep.add_argument("--config", type=Path, required=True)
+    mbr = mc_sub.add_parser("boot-run", help="bootstrap ESR size/power (configs/mc_esr_boot.toml)")
+    mbr.add_argument("--config", type=Path, required=True)
+    mbr.add_argument("--workers", type=int, default=None, help=WORKERS_HELP)
+    mbr.add_argument("--force-new", action="store_true")
+    mbr.add_argument(
+        "--max-minutes",
+        type=float,
+        default=None,
+        help="start no new unit after this many minutes (rerun to resume)",
+    )
+    mbrep = mc_sub.add_parser("boot-report")
+    mbrep.add_argument("--config", type=Path, required=True)
     return parser
 
 
@@ -188,6 +200,22 @@ def _dispatch(args: argparse.Namespace) -> int:
         print(write_study_report(args.config))
         return 0
     if args.command == "mc":
+        if args.action == "boot-run":
+            from tailcheck.montecarlo.esr_boot import run_boot_mc
+
+            out = run_boot_mc(
+                args.config,
+                workers=args.workers,
+                force_new=args.force_new,
+                max_minutes=args.max_minutes,
+            )
+            print(f"run directory: {out}")
+            return 0
+        if args.action == "boot-report":
+            from tailcheck.montecarlo.esr_boot import write_boot_report
+
+            print(write_boot_report(args.config))
+            return 0
         if args.action == "run":
             from tailcheck.montecarlo.runner import run_mc
 

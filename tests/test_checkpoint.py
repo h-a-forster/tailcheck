@@ -87,7 +87,7 @@ def test_run_units_skip_and_resume(tmp_path: Path) -> None:
     stats = run_units(store, units[:2], _square)
     assert stats["ran"] == 2
     stats = run_units(store, units, _square)
-    assert stats == {"total": 5, "skipped": 2, "ran": 3, "failed": 0}
+    assert stats == {"total": 5, "skipped": 2, "ran": 3, "failed": 0, "stopped": 0}
     assert store.read("u4")["value"] == 16
     log = store.log_path.read_text().strip().splitlines()
     assert len(log) == 5 and log[-1].endswith("5/5")

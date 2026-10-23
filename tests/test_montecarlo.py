@@ -112,3 +112,19 @@ def test_distortion_band_follows_level() -> None:
 
     assert distortion_band(0.05) == pytest.approx((0.03, 0.07))
     assert distortion_band(0.10) == pytest.approx((0.06, 0.14))
+
+
+def test_cluster_interval_independent_and_clustered() -> None:
+    from tailcheck.montecarlo.report import cluster_interval
+
+    rng = np.random.default_rng(4)
+    m = np.full(400, 50)
+    k = rng.binomial(50, 0.05, size=400)
+    lo, hi, deff = cluster_interval(k, m)
+    assert deff == pytest.approx(1.0, abs=0.2)
+    assert lo < k.sum() / m.sum() < hi
+    # a shared per-chunk shift inflates the variance
+    p_chunk = np.clip(0.05 + rng.normal(0, 0.04, 400), 0, 1)
+    k2 = rng.binomial(50, p_chunk)
+    assert cluster_interval(k2, m)[2] > 1.8
+    assert np.isnan(cluster_interval(np.array([1]), np.array([50]))[0])

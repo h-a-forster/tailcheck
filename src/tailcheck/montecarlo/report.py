@@ -33,6 +33,28 @@ def distortion_band(level: float) -> tuple[float, float]:
     return 0.6 * level, 1.4 * level
 
 
+def cluster_interval(
+    k: np.ndarray, m: np.ndarray, z: float = 1.959963984540054
+) -> tuple[float, float, float]:
+    """Normal 95% interval for a pooled rate with clusters (chunks) as the sampling units.
+
+    ``k[j]`` rejections out of ``m[j]`` replications in chunk ``j``. Returns ``(lo, hi,
+    design_effect)``, where the design effect is the cluster-robust variance over the
+    binomial variance (1 when replications are independent; above 1 when replications of a
+    chunk share something, such as one Acerbi-Szekely null sample).
+    """
+    k, m = np.asarray(k, dtype=float), np.asarray(m, dtype=float)
+    n, g = m.sum(), len(m)
+    if g < 2 or n == 0:
+        return math.nan, math.nan, math.nan
+    p = k.sum() / n
+    var_c = g / (g - 1) * float(np.sum((k - p * m) ** 2)) / n**2
+    var_b = p * (1 - p) / n
+    h = z * math.sqrt(var_c)
+    deff = var_c / var_b if var_b > 0 else math.nan
+    return max(0.0, p - h), min(1.0, p + h), deff
+
+
 def collect_mc(cfg_path: Path) -> pd.DataFrame:
     cfg = load_config(cfg_path)
     level = float(cfg.get("level", 0.05))
@@ -44,8 +66,11 @@ def collect_mc(cfg_path: Path) -> pd.DataFrame:
         d = store.read(uid)
         for test, pv in d["pvalues"].items():
             key = (test, d["dgp"], int(d["n"]), float(d["alpha"]))
-            slot = pooled.setdefault(key, {"p": [], "secs": []})
-            slot["p"].extend(np.nan if v is None else float(v) for v in pv)
+            slot = pooled.setdefault(key, {"p": [], "secs": [], "k": [], "m": []})
+            vals = [np.nan if v is None else float(v) for v in pv]
+            slot["p"].extend(vals)
+            slot["k"].append(sum(1 for v in vals if v < level))
+            slot["m"].append(len(vals))
             slot["secs"].append(
                 float(d.get("seconds_per_rep", d.get("median_seconds_per_test", 0)))
             )
@@ -56,6 +81,7 @@ def collect_mc(cfg_path: Path) -> pd.DataFrame:
         fails = int(np.isnan(p).sum())
         rej = int(np.sum(p[~np.isnan(p)] < level))
         lo, hi = wilson(rej, reps)
+        lo_c, hi_c, deff = cluster_interval(np.array(slot["k"]), np.array(slot["m"]))
         kind = "size" if dgp in size_dgps else "power"
         rows.append(
             {
@@ -71,6 +97,9 @@ def collect_mc(cfg_path: Path) -> pd.DataFrame:
                 "lo": lo,
                 "hi": hi,
                 "distorted": bool(kind == "size" and (hi < band[0] or lo > band[1])),
+                "lo_chunk": lo_c,
+                "hi_chunk": hi_c,
+                "design_effect": deff,
                 "median_seconds": float(np.median(slot["secs"])),
             }
         )

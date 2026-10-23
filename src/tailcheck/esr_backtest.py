@@ -70,13 +70,15 @@ def esr_backtest(
     early_stopping: int = 10,
     _esreg_compat_g2pp: bool = False,
     _also_esback_g2pp: bool = False,
+    _keep_boot_stats: bool = False,
 ) -> BacktestResult:
     """Run one ESR backtest; asymptotic p-value, plus bootstrap p-value if ``n_boot > 0``.
 
     Primary p-value: two-sided Wald chi2(2) for versions 1 and 2; one-sided ("less") for
     version 3, where a negative intercept means risk is underestimated. Too few negative
     quantile residuals, a failed fit or a singular covariance give ``pvalue = nan`` with
-    ``details["reason"]``.
+    ``details["reason"]``. ``_keep_boot_stats`` stores the centred bootstrap statistics in
+    ``details["bootstrap_stats"]`` (used by the warp-speed Monte Carlo of the bootstrap test).
     """
     alpha = check_alpha(alpha)
     if version not in (1, 2, 3):
@@ -163,7 +165,19 @@ def esr_backtest(
     if n_boot > 0:
         details.update(
             _bootstrap(
-                version, y, xq, xe, alpha, fit, stat, n_boot, seed, sparsity, sigma_est, misspec
+                version,
+                y,
+                xq,
+                xe,
+                alpha,
+                fit,
+                stat,
+                n_boot,
+                seed,
+                sparsity,
+                sigma_est,
+                misspec,
+                keep_stats=_keep_boot_stats,
             )
         )
     return BacktestResult(name, stat, p, n, df, alt, details)
@@ -182,6 +196,7 @@ def _bootstrap(
     sparsity: Sparsity,
     sigma_est: SigmaEstimator,
     misspec: bool,
+    keep_stats: bool = False,
 ) -> dict[str, Any]:
     """iid row bootstrap; statistic centred at the full-sample estimate (DESIGN 4.3.4)."""
     rng = np.random.default_rng(None if seed is None else seed + 7919)
@@ -216,6 +231,8 @@ def _bootstrap(
         except (ValueError, RuntimeError, np.linalg.LinAlgError, ZeroDivisionError):
             failed += 1
     out: dict[str, Any] = {"n_boot": n_boot, "n_boot_failed": failed}
+    if keep_stats:
+        out["bootstrap_stats"] = list(stats_b)
     if failed >= 0.05 * n_boot:
         out["bootstrap_reason"] = f"{failed} of {n_boot} bootstrap fits failed"
         out["pvalue_bootstrap"] = math.nan

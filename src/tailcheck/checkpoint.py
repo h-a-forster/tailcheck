@@ -311,6 +311,7 @@ def run_units(
     fn: Callable[[Any], Mapping[str, object]],
     workers: int = 1,
     on_error: str = "raise",
+    max_seconds: float | None = None,
 ) -> dict[str, int]:
     """Run ``fn(arg)`` for every ``(unit_id, arg)`` not yet done and store each result.
 
@@ -318,14 +319,25 @@ def run_units(
     :data:`MAX_WORKERS` processes are used; each sets BLAS thread counts to 1. With
     ``on_error="log"`` a failing unit is logged and skipped (it stays not-done, so a rerun
     retries it); with ``"raise"`` the first failure propagates after finished units are saved.
+    With ``max_seconds`` no new unit is started after that much wall time; units already
+    running finish and are stored, and ``stats["stopped"]`` is 1 (a rerun resumes).
     """
     workers = max(1, min(int(workers), MAX_WORKERS))
     total = len(units)
     todo = [(u, a) for u, a in units if not store.done(u)]
     n_done = total - len(todo)
-    stats = {"total": total, "skipped": n_done, "ran": 0, "failed": 0}
+    stats = {"total": total, "skipped": n_done, "ran": 0, "failed": 0, "stopped": 0}
     if not todo:
         return stats
+    t_start = time.monotonic()
+
+    def out_of_time() -> bool:
+        if max_seconds is not None and time.monotonic() - t_start >= max_seconds:
+            if not stats["stopped"]:
+                stats["stopped"] = 1
+                store.log("-", 0.0, n_done, total, note="time budget reached; stopping")
+            return True
+        return False
 
     def handle(uid: str, result: dict[str, object], secs: float) -> None:
         nonlocal n_done
@@ -342,6 +354,8 @@ def run_units(
 
     if workers == 1:
         for uid, arg in todo:
+            if out_of_time():
+                break
             try:
                 res, secs = _timed(fn, arg)
             except Exception as exc:  # noqa: BLE001
@@ -375,6 +389,11 @@ def run_units(
                         raise
                     continue
                 handle(uid, res, secs)
+            if out_of_time():
+                # drop queued units that have not started; running ones finish and are stored
+                for f in [f for f in pending if f.cancel()]:
+                    del pending[f]
+                continue
             for uid, arg in it:
                 pending[pool.submit(_timed, fn, arg)] = uid
                 if len(pending) >= 2 * workers:

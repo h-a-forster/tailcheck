@@ -1,0 +1,34 @@
+# Timing calibration for configs/mc_esr_boot.toml (a few replications per cell type).
+name = "mc-esr-boot-calib"
+seed = 1
+level = 0.05
+
+[[cells]]
+mode = "warp"
+dgp = "garch-t5"
+n = 1000
+alpha = 0.025
+versions = [1, 3]
+reps = 6
+
+[[cells]]
+mode = "warp"
+dgp = "garch-t5"
+n = 2000
+alpha = 0.025
+versions = [1, 3]
+reps = 4
+
+[[cells]]
+mode = "exact"
+dgp = "garch-t5"
+n = 1000
+alpha = 0.025
+versions = [3]
+n_boot = 19
+reps = 2
+
+[run]
+workers = 2
+chunk = 2
+out_dir = "runs/mc-esr-boot-calib"
