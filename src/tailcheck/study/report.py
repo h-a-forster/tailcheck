@@ -25,7 +25,7 @@ def _p(d: dict[str, Any] | None, key: str = "pvalue") -> float:
 
 def collect_study(cfg_path: Path) -> dict[str, pd.DataFrame]:
     cfg = load_config(cfg_path)
-    store = UnitStore(Path(cfg["run"]["out_dir"]), config_hash(cfg))
+    store = UnitStore(Path(cfg["run"]["out_dir"]), config_hash(cfg), read_only=True)
     classes = {a["id"]: a.get("class", "") for a in cfg["data"]["assets"]}
     rows, regimes, compares, forecasts = [], [], [], []
     for uid in store.completed():
@@ -131,7 +131,12 @@ def _md(df: pd.DataFrame) -> str:
 def write_study_report(cfg_path: Path) -> str:
     """Write ``results/<name>/`` CSVs, ``summary.json`` and ``tables.md``; return a summary."""
     cfg = load_config(cfg_path)
-    t = collect_study(cfg_path)
+    t = collect_study(cfg_path)  # read-only; raises if the run directory is missing
+    if not len(t["backtests"]):
+        raise ValueError(
+            f"no completed backtest units in {cfg['run']['out_dir']}; "
+            "run `tailcheck study run` first (nothing was written)"
+        )
     out = Path("results") / cfg["name"]
     out.mkdir(parents=True, exist_ok=True)
     for name, df in t.items():
@@ -209,6 +214,8 @@ def write_study_report(cfg_path: Path) -> str:
     }
     manifest = Path(cfg["run"]["out_dir"]) / "manifest.json"
     if manifest.exists():
-        summary["run_manifest"] = json.loads(manifest.read_text())
-    (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+        summary["run_manifest"] = json.loads(manifest.read_text(encoding="utf-8"))
+    (out / "summary.json").write_text(
+        json.dumps(summary, indent=2) + "\n", encoding="utf-8", newline="\n"
+    )
     return json.dumps(summary, indent=2)

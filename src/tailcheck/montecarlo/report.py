@@ -25,10 +25,19 @@ def wilson(k: int, n: int, z: float = 1.959963984540054) -> tuple[float, float]:
     return max(0.0, c - h), min(1.0, c + h)
 
 
+def distortion_band(level: float) -> tuple[float, float]:
+    """Size band ``[0.6 level, 1.4 level]`` ([3%, 7%] at the 5% level).
+
+    A size cell is flagged as distorted when its whole Wilson interval lies outside it.
+    """
+    return 0.6 * level, 1.4 * level
+
+
 def collect_mc(cfg_path: Path) -> pd.DataFrame:
     cfg = load_config(cfg_path)
     level = float(cfg.get("level", 0.05))
-    store = UnitStore(Path(cfg["run"]["out_dir"]), config_hash(cfg))
+    band = distortion_band(level)
+    store = UnitStore(Path(cfg["run"]["out_dir"]), config_hash(cfg), read_only=True)
     size_dgps = set(cfg["cheap"]["dgps_size"]) | set(cfg["esr"]["dgps_size"])
     pooled: dict[tuple[str, str, int, float], dict[str, Any]] = {}
     for uid in store.completed():
@@ -61,7 +70,7 @@ def collect_mc(cfg_path: Path) -> pd.DataFrame:
                 "rate": rej / reps if reps else math.nan,
                 "lo": lo,
                 "hi": hi,
-                "distorted": bool(kind == "size" and (hi < 0.03 or lo > 0.07)),
+                "distorted": bool(kind == "size" and (hi < band[0] or lo > band[1])),
                 "median_seconds": float(np.median(slot["secs"])),
             }
         )
@@ -70,7 +79,14 @@ def collect_mc(cfg_path: Path) -> pd.DataFrame:
 
 def write_mc_report(cfg_path: Path) -> str:
     cfg = load_config(cfg_path)
-    df = collect_mc(cfg_path)
+    level = float(cfg.get("level", 0.05))
+    lo_band, hi_band = distortion_band(level)
+    df = collect_mc(cfg_path)  # read-only; raises if the run directory is missing
+    if not len(df):
+        raise ValueError(
+            f"no completed Monte Carlo units in {cfg['run']['out_dir']}; "
+            "run `tailcheck mc run` first (nothing was written)"
+        )
     out = Path("results") / cfg["name"]
     out.mkdir(parents=True, exist_ok=True)
     df.to_csv(out / "size_power.csv", index=False, float_format="%.6g")
@@ -79,7 +95,9 @@ def write_mc_report(cfg_path: Path) -> str:
         sub = df[df["kind"] == kind]
         if not len(sub):
             continue
-        lines.append(f"### {kind.capitalize()}: rejection rate at 5% (95% Wilson interval)\n")
+        lines.append(
+            f"### {kind.capitalize()}: rejection rate at {100 * level:g}% (95% Wilson interval)\n"
+        )
         sub = sub.assign(
             cell=sub["dgp"] + " n=" + sub["n"].astype(str) + " a=" + sub["alpha"].astype(str)
         )
@@ -109,7 +127,7 @@ def write_mc_report(cfg_path: Path) -> str:
             lines.append(f"| {cell} | " + " | ".join(str(r[c]) for c in cols) + " |")
         lines.append("")
     lines.append(
-        "`*` size distorted (Wilson interval entirely outside [0.03, 0.07]); "
+        f"`*` size distorted (Wilson interval entirely outside [{lo_band:.3g}, {hi_band:.3g}]); "
         "`f=k`: k replications where the test was undefined or failed (counted as "
         "non-rejections)."
     )
@@ -124,6 +142,8 @@ def write_mc_report(cfg_path: Path) -> str:
     }
     manifest = Path(cfg["run"]["out_dir"]) / "manifest.json"
     if manifest.exists():
-        summary["run_manifest"] = json.loads(manifest.read_text())
-    (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+        summary["run_manifest"] = json.loads(manifest.read_text(encoding="utf-8"))
+    (out / "summary.json").write_text(
+        json.dumps(summary, indent=2) + "\n", encoding="utf-8", newline="\n"
+    )
     return json.dumps({k: v for k, v in summary.items() if k != "run_manifest"}, indent=2)

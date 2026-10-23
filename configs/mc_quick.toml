@@ -13,7 +13,7 @@ tests = ["kupiec", "christoffersen_ind", "christoffersen_cc", "dq", "as_z1", "as
 n = [250, 1000, 2000]
 alphas = [0.01, 0.025]
 dgps_size = ["iid-t5", "garch-t5"]
-dgps_power = ["scale-0.85", "normal-tails", "slow-vol"]
+dgps_power = ["scale-0.85", "normal-tails", "unconditional"]
 reps_size = 2000
 reps_power = 1000
 as_n_sim = 2000
@@ -29,7 +29,6 @@ dgps_power = ["scale-0.85", "normal-tails"]
 reps_size = 200                     # calibrated 2026-10-23: see results/mc-quick/calibration.json
 reps_power = 40
 chunk = 10
-bootstrap = 0
 
 [run]
 workers = 4

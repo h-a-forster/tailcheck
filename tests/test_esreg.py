@@ -257,3 +257,31 @@ def test_intercept_only_forces_iid_ind() -> None:
     fit = esreg(y, None, None, 0.025, early_stopping=0)
     _, info = vcov_details(fit, "nid", "scl_sp")
     assert info["sparsity"] == "iid" and info["sigma_est"] == "ind"
+
+
+def test_bandwidth_sj_blocked_pairs_exact() -> None:
+    # the blocked pair histogram equals histogramming all differences at once
+    from tailcheck.esreg.covariance import _pair_distance_counts
+
+    rng = np.random.default_rng(4)
+    x = np.sort(rng.standard_t(4, 700))
+    i, j = np.triu_indices(len(x), k=1)
+    dist = np.abs(x[i] - x[j])
+    edges = np.linspace(0.0, dist.max() * (1 + 1e-12) + 1e-300, 5001)
+    full, _ = np.histogram(dist, edges)
+    np.testing.assert_array_equal(_pair_distance_counts(x, edges, block_elems=10_000), full)
+    assert float(x[-1] - x[0]) == float(dist.max())
+
+
+def test_bandwidth_sj_memory_and_binned_path() -> None:
+    import tracemalloc
+
+    rng = np.random.default_rng(5)
+    x = rng.standard_t(4, 6000)
+    tracemalloc.start()
+    h_exact = bandwidth_sj(x)
+    peak = tracemalloc.get_traced_memory()[1]
+    tracemalloc.stop()
+    assert peak < 150e6  # all-pairs arrays would need about 0.7 GB at n = 6000
+    h_binned = bandwidth_sj(x, max_exact=1000)  # data binned first, as R's bw.SJ
+    assert h_binned == pytest.approx(h_exact, rel=1e-3)

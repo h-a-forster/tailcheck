@@ -8,6 +8,7 @@ Specification: ``docs/DESIGN.md`` section 4.6.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import math
@@ -17,7 +18,8 @@ import re
 import sys
 import tempfile
 import time
-from collections.abc import Callable, Iterable, Mapping, Sequence
+import warnings
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
 from datetime import UTC, datetime
 from pathlib import Path
@@ -30,7 +32,11 @@ _THREAD_VARS = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
 
 
 class ConfigMismatchError(RuntimeError):
-    """The store was created for a different configuration."""
+    """The store was created for a different configuration or different inputs."""
+
+
+class RunNotFoundError(FileNotFoundError):
+    """A read-only store was opened on a directory without a run manifest."""
 
 
 def config_hash(config: Mapping[str, Any]) -> str:
@@ -77,6 +83,19 @@ def _versions() -> dict[str, str]:
     return out
 
 
+def source_hash() -> str:
+    """SHA-256 (first 16 hex chars) of the installed tailcheck source files.
+
+    Recorded in each run manifest so that a resume with changed code is visible.
+    """
+    root = Path(__file__).resolve().parent
+    h = hashlib.sha256()
+    for f in sorted(root.rglob("*.py")):
+        h.update(f.relative_to(root).as_posix().encode())
+        h.update(f.read_bytes().replace(b"\r\n", b"\n"))
+    return h.hexdigest()[:16]
+
+
 def _atomic_write_bytes(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=".tmp-", dir=path.parent)
@@ -100,32 +119,83 @@ class UnitStore:
     ``root/progress.log`` (``ISO time | unit | seconds | done/total``).
     """
 
-    def __init__(self, root: Path, config_hash: str, force_new: bool = False) -> None:
+    def __init__(
+        self,
+        root: Path,
+        config_hash: str,
+        force_new: bool = False,
+        inputs: Mapping[str, Any] | None = None,
+        read_only: bool = False,
+    ) -> None:
+        """Open (or create) the store.
+
+        ``inputs`` describes what the configuration hash does not cover (input data hashes,
+        package version). It is stored in the manifest; reopening with different ``inputs``
+        raises :class:`ConfigMismatchError` unless ``force_new`` is set, so a resume never
+        mixes units computed on different data. The source hash of the code is recorded
+        too; a change only produces a warning (and a ``progress.log`` line), because
+        documentation edits should not invalidate a long run.
+
+        ``read_only=True`` (for reports) creates nothing: it requires an existing manifest
+        with the same configuration hash and raises :class:`RunNotFoundError` otherwise.
+        """
         self.root = Path(root)
         self.config_hash = config_hash
         self.units_dir = self.root / "units"
         self.log_path = self.root / "progress.log"
-        self.units_dir.mkdir(parents=True, exist_ok=True)
+        self.read_only = read_only
         manifest = self.root / "manifest.json"
-        if manifest.exists():
+        if read_only:
+            if not manifest.exists():
+                raise RunNotFoundError(f"no run found at {self.root} (manifest.json missing)")
             old = json.loads(manifest.read_text(encoding="utf-8"))
             if old.get("config_hash") != config_hash:
+                raise ConfigMismatchError(
+                    f"{self.root} holds results for config {old.get('config_hash')}, "
+                    f"not {config_hash}"
+                )
+            self.manifest: dict[str, Any] = old
+            return
+        self.units_dir.mkdir(parents=True, exist_ok=True)
+        inputs_j = _jsonable(dict(inputs)) if inputs is not None else None
+        code = source_hash()
+        if manifest.exists():
+            old = json.loads(manifest.read_text(encoding="utf-8"))
+            problem = None
+            if old.get("config_hash") != config_hash:
+                problem = (
+                    f"{self.root} holds results for config {old.get('config_hash')}, "
+                    f"not {config_hash}"
+                )
+            elif inputs_j is not None and old.get("inputs") != inputs_j:
+                problem = (
+                    f"{self.root} was computed on different inputs "
+                    f"(stored {old.get('inputs')}, now {inputs_j})"
+                )
+            if problem is not None:
                 if not force_new:
-                    raise ConfigMismatchError(
-                        f"{self.root} holds results for config {old.get('config_hash')}, "
-                        f"not {config_hash}; use a new directory or force_new=True"
-                    )
+                    raise ConfigMismatchError(f"{problem}; use a new directory or force_new=True")
                 for p in self.units_dir.glob("*"):
                     p.unlink()
                 manifest.unlink()
+            elif old.get("source_hash") != code:
+                msg = (
+                    f"resuming {self.root} with changed code (source hash "
+                    f"{old.get('source_hash')} -> {code}); finished units are kept"
+                )
+                warnings.warn(msg, stacklevel=2)
+                self._append_log(f"{datetime.now(UTC).isoformat(timespec='seconds')} | {msg}")
         if not manifest.exists():
             meta = {
                 "config_hash": config_hash,
+                "inputs": inputs_j,
+                "source_hash": code,
                 "versions": _versions(),
                 "started": datetime.now(UTC).isoformat(timespec="seconds"),
                 "platform": sys.platform,
             }
             _atomic_write_bytes(manifest, json.dumps(meta, indent=2).encode())
+        self.manifest = json.loads(manifest.read_text(encoding="utf-8"))
 
     def path(self, unit_id: str) -> Path:
         return self.units_dir / f"{safe_id(unit_id)}.json"
@@ -167,7 +237,9 @@ class UnitStore:
             return {k: z[k] for k in z.files}
 
     def completed(self) -> list[str]:
-        out = []
+        out: list[str] = []
+        if not self.units_dir.is_dir():
+            return out
         for p in sorted(self.units_dir.glob("*.json")):
             try:
                 d = json.loads(p.read_text(encoding="utf-8"))
@@ -184,13 +256,47 @@ class UnitStore:
         )
         if note:
             line += f" | {note}"
+        self._append_log(line)
+
+    def _append_log(self, line: str) -> None:
+        if self.read_only:
+            raise RuntimeError("store is read-only")
         with open(self.log_path, "a", encoding="utf-8") as fh:
             fh.write(line + "\n")
 
 
+_THREAD_LIMITER: Any = None
+
+
 def _init_worker() -> None:
+    """Pin BLAS/OpenMP pools to one thread in a worker process.
+
+    The environment variables are also set in the parent while the pool runs (see
+    :func:`_single_thread_env`), so a spawned child sees them before numpy loads. This
+    initializer runs after numpy is already imported (unpickling it imports this module),
+    so it also limits the live pools through ``threadpoolctl``.
+    """
+    global _THREAD_LIMITER
     for var in _THREAD_VARS:
         os.environ[var] = "1"
+    from threadpoolctl import threadpool_limits
+
+    _THREAD_LIMITER = threadpool_limits(limits=1)
+
+
+@contextlib.contextmanager
+def _single_thread_env() -> Iterator[None]:
+    old = {v: os.environ.get(v) for v in _THREAD_VARS}
+    for v in _THREAD_VARS:
+        os.environ[v] = "1"
+    try:
+        yield
+    finally:
+        for v, val in old.items():
+            if val is None:
+                os.environ.pop(v, None)
+            else:
+                os.environ[v] = val
 
 
 def _timed(fn: Callable[[Any], Mapping[str, object]], arg: Any) -> tuple[dict[str, object], float]:
@@ -244,7 +350,10 @@ def run_units(
             handle(uid, res, secs)
         return stats
 
-    with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker) as pool:
+    with (
+        _single_thread_env(),
+        ProcessPoolExecutor(max_workers=workers, initializer=_init_worker) as pool,
+    ):
         pending: dict[Future[tuple[dict[str, object], float]], str] = {}
         it: Iterable[tuple[str, Any]] = iter(todo)
         for uid, arg in it:

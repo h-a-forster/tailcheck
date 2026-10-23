@@ -50,7 +50,6 @@ caviar_best_starts = 10
 esr_versions = [1, 2, 3]
 esr_bootstrap = 0                  # asymptotic p-values only in the default run
 mcneil_frey_boot = 2000
-as_statistic = "z2"
 dq_lags = 4
 
 [compare]

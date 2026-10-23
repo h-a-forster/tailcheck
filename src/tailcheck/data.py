@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 import time
 import urllib.request
 import zipfile
@@ -19,6 +20,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from tailcheck.checkpoint import _atomic_write_bytes
+
 BINANCE_URL = (
     "https://data.binance.vision/data/spot/monthly/klines/{symbol}/1d/{symbol}-1d-{ym}.zip"
 )
@@ -28,6 +31,28 @@ _UA = {"User-Agent": "tailcheck (research; +https://github.com/)"}
 
 class DataError(RuntimeError):
     """Download, checksum or parsing problem."""
+
+
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _check_prices(values: np.ndarray, what: str) -> None:
+    if not np.all(np.isfinite(values)):
+        raise DataError(f"{what}: {int(np.sum(~np.isfinite(values)))} non-finite prices")
+    if np.any(values <= 0):
+        raise DataError(f"{what}: non-positive prices")
+
+
+def _read_checksum(path: Path) -> str | None:
+    """The SHA-256 in a Binance ``.CHECKSUM`` file, or None if the file is malformed."""
+    try:
+        parts = path.read_text(encoding="ascii").split()
+    except (OSError, UnicodeDecodeError):
+        return None
+    if not parts:
+        return None
+    digest = parts[0].strip().lower()
+    return digest if _SHA256_RE.match(digest) else None
 
 
 def _get(url: str, retries: int = 3, timeout: float = 60.0) -> bytes:
@@ -71,14 +96,18 @@ def parse_binance_zip(blob: bytes) -> pd.Series:
     t = df[0].to_numpy(dtype=np.int64)
     unit = timestamp_unit(t)
     dates = pd.to_datetime(t, unit=unit, utc=True).tz_convert(None).normalize()
-    return pd.Series(df[4].to_numpy(dtype=float), index=pd.DatetimeIndex(dates), name="close")
+    close = pd.to_numeric(df[4], errors="coerce").to_numpy(dtype=float)
+    _check_prices(close, names[0])
+    return pd.Series(close, index=pd.DatetimeIndex(dates), name="close")
 
 
 def fetch_binance_daily(symbol: str, start: str, end: str, cache_dir: Path) -> pd.Series:
     """Daily close (UTC day) as a float Series indexed by date.
 
     Each monthly zip is verified against its published ``.CHECKSUM`` (SHA-256) and cached
-    under ``cache_dir/raw/binance/<symbol>/``.
+    under ``cache_dir/raw/binance/<symbol>/``. Downloads are written atomically, so an
+    interrupted download never leaves a truncated file. A malformed checksum file is
+    re-downloaded; on a mismatch both files are fetched again once before giving up.
     """
     root = Path(cache_dir) / "raw" / "binance" / symbol
     root.mkdir(parents=True, exist_ok=True)
@@ -87,16 +116,21 @@ def fetch_binance_daily(symbol: str, start: str, end: str, cache_dir: Path) -> p
         url = BINANCE_URL.format(symbol=symbol, ym=ym)
         zpath = root / f"{symbol}-1d-{ym}.zip"
         cpath = root / f"{symbol}-1d-{ym}.zip.CHECKSUM"
-        if not cpath.exists():
-            cpath.write_bytes(_get(url + ".CHECKSUM"))
-        expected = cpath.read_text().split()[0].strip().lower()
         for attempt in range(2):
+            expected = _read_checksum(cpath) if cpath.exists() else None
+            if expected is None:
+                _atomic_write_bytes(cpath, _get(url + ".CHECKSUM"))
+                expected = _read_checksum(cpath)
+                if expected is None:
+                    cpath.unlink()
+                    raise DataError(f"malformed checksum file for {zpath.name}")
             if not zpath.exists():
-                zpath.write_bytes(_get(url))
+                _atomic_write_bytes(zpath, _get(url))
             got = hashlib.sha256(zpath.read_bytes()).hexdigest()
             if got == expected:
                 break
             zpath.unlink()
+            cpath.unlink()
             if attempt == 1:
                 raise DataError(f"checksum mismatch for {zpath.name}")
         parts.append(parse_binance_zip(zpath.read_bytes()))
@@ -115,32 +149,49 @@ def fetch_fred(series: str, cache_dir: Path, refresh: bool = False) -> pd.Series
     """Daily level from FRED's public CSV endpoint; missing days dropped.
 
     The first download is cached as ``cache_dir/raw/fred/<series>.csv`` and reused (a fixed
-    snapshot) unless ``refresh`` is set.
+    snapshot) unless ``refresh`` is set. FRED publishes no checksum, so a download is parsed
+    and validated before it is written (atomically) to the cache.
     """
     path = Path(cache_dir) / "raw" / "fred" / f"{series}.csv"
     path.parent.mkdir(parents=True, exist_ok=True)
     if refresh or not path.exists():
-        path.write_bytes(_get(FRED_URL.format(series=series)))
-    df = pd.read_csv(path, na_values=[".", ""])
+        blob = _get(FRED_URL.format(series=series))
+        parse_fred_csv(blob, series)
+        _atomic_write_bytes(path, blob)
+    return parse_fred_csv(path.read_bytes(), series)
+
+
+def parse_fred_csv(blob: bytes, series: str) -> pd.Series:
+    """Parse FRED's ``fredgraph.csv`` (date, value; ``.`` marks a missing day)."""
+    try:
+        df = pd.read_csv(io.BytesIO(blob), na_values=[".", ""])
+    except (ValueError, pd.errors.ParserError) as exc:
+        raise DataError(f"{series}: unreadable FRED CSV: {exc}") from exc
     if df.shape[1] != 2:
         raise DataError(f"unexpected FRED columns {list(df.columns)}")
     df.columns = ["date", "value"]
     df = df.dropna()
-    s = pd.Series(
-        df["value"].to_numpy(dtype=float), index=pd.DatetimeIndex(df["date"]), name=series
-    )
-    s = s.sort_index()
+    if df.empty:
+        raise DataError(f"{series}: FRED CSV has no observations")
+    try:
+        values = df["value"].to_numpy(dtype=float)
+        index = pd.DatetimeIndex(pd.to_datetime(df["date"], format="%Y-%m-%d"))
+    except (ValueError, TypeError) as exc:
+        raise DataError(f"{series}: malformed FRED CSV: {exc}") from exc
+    s = pd.Series(values, index=index, name=series).sort_index()
     if s.index.has_duplicates:
         raise DataError(f"{series}: duplicate dates")
-    if np.any(s.to_numpy() <= 0):
-        raise DataError(f"{series}: non-positive levels")
+    _check_prices(s.to_numpy(), series)
     return s
 
 
 def log_returns_pct(prices: pd.Series) -> pd.Series:
     """100 * log(P_t / P_{t-1}), first row dropped."""
     p = prices.astype(float)
-    if np.any(p.to_numpy() <= 0):
+    v = p.to_numpy()
+    if not np.all(np.isfinite(v)):
+        raise ValueError("prices must be finite")
+    if np.any(v <= 0):
         raise ValueError("prices must be positive")
     return (100.0 * np.log(p / p.shift(1))).iloc[1:]
 
@@ -171,8 +222,8 @@ def fetch_assets(
             raise ValueError(f"unknown source {src!r}")
         ret = log_returns_pct(prices)
         out = processed_path(cache_dir, aid)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        ret.rename("r").to_frame().to_csv(out, index_label="date", float_format="%.12g")
+        csv = ret.rename("r").to_frame().to_csv(index_label="date", float_format="%.12g")
+        _atomic_write_bytes(out, csv.encode())
         stored = load_returns(cache_dir, aid)
         manifest[aid] = {
             "source": src,
@@ -195,4 +246,6 @@ def load_returns(cache_dir: Path, asset: str) -> pd.Series:
 
 def write_manifest(path: Path, manifest: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
+    )

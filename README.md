@@ -22,10 +22,11 @@ Acerbi-Szekely tests (searched 2026-10-23).
 
 ## What has been checked
 
-- **Reference values.** Kupiec non-rejection regions, Christoffersen worked examples, the
-  Basel cumulative probabilities (8.11% ... 99.99%), standardized-t and normal VaR/ES, and
-  Hall-Sheather bandwidths are tested to 1e-9 against independent computations
-  (`scripts/reference_values.py`).
+- **Reference values.** Tested against independent computations
+  (`scripts/reference_values.py`): Kupiec non-rejection regions (exact integer bounds),
+  Christoffersen worked examples and standardized-t and normal VaR/ES (to 1e-9), Hall-Sheather
+  bandwidths (to 1e-8), and the Basel cumulative probabilities (the published two-decimal
+  table, 8.11% ... 99.99%, plus exact values to 1e-6).
 - **Against R.** On committed fixtures from `esreg` 0.6.2 / `esback` 0.3.1 (run through
   webR): quantile regression agrees to 1e-14; our joint-regression loss is never above R's;
   the sandwich covariance agrees to 4e-6 (`scl_N`) and 0.4% (`scl_sp`) at R's coefficients;

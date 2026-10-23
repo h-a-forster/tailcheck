@@ -20,9 +20,10 @@ import numpy as np
 import pandas as pd
 
 from tailcheck.checkpoint import UnitStore, _atomic_write_bytes, config_hash, run_units, safe_id
-from tailcheck.data import load_returns
+from tailcheck.data import load_returns, series_sha256
 
 REGIMES = ("full", "calm", "turbulent")
+STAGES = ("forecast", "backtest", "compare")
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -56,6 +57,59 @@ def asset_frame(cfg: Mapping[str, Any], asset: str) -> tuple[pd.Series, int, int
     return r, oos_start, oos_end, turb
 
 
+def accumulate_as_null(
+    acc_s: np.ndarray,
+    acc_n: np.ndarray,
+    q: np.ndarray,
+    e: np.ndarray,
+    draws: np.ndarray,
+    turbulent: np.ndarray,
+) -> None:
+    """Add one block of predictive draws to the Acerbi-Szekely Z2 null accumulators.
+
+    ``q`` and ``e`` are ``(days, n_alpha)`` forecasts, ``draws`` is ``(days, n_draws)`` (one
+    row of predictive draws per day) and ``turbulent`` the 0/1 regime label per day. For each
+    regime ``g`` (full, calm, turbulent) and level ``j``, ``acc_s[g, j]`` gains, per draw
+    column ``m``, ``sum_t 1{x_tm <= q_tj} x_tm / e_tj`` over the regime's days, and
+    ``acc_n[g, j]`` the number of simulated exceedances. Column ``m`` across all days is one
+    simulated path from the forecast distribution, so ``1 - acc_s[g, j] / (n_g alpha_j)`` is
+    a draw of Z2 under the null (DESIGN 4.2).
+    """
+    reg = np.asarray(turbulent)
+    masks = (np.ones(len(reg), bool), reg == 0, reg == 1)
+    for j in range(q.shape[1]):
+        qj = q[:, j][:, None]
+        ej = e[:, j][:, None]
+        hit = draws <= qj
+        contrib = np.where(hit, draws / ej, 0.0)
+        for g, mask in enumerate(masks):
+            if mask.any():
+                acc_s[g, j] += contrib[mask].sum(axis=0)
+                acc_n[g, j] += hit[mask].sum(axis=0)
+
+
+def as_z2_regime(
+    r: np.ndarray,
+    q: np.ndarray,
+    e: np.ndarray,
+    alpha: float,
+    mask: np.ndarray,
+    as_sum_gj: np.ndarray,
+) -> dict[str, float | int]:
+    """Observed Z2 on the masked days and its simulation p-value from the accumulated null."""
+    from tailcheck.es_tests import acerbi_szekely_pvalue_from_null, acerbi_szekely_z2
+
+    z_obs = acerbi_szekely_z2(r[mask], q[mask], e[mask], alpha)
+    z_null = 1.0 - np.asarray(as_sum_gj, dtype=float) / (int(mask.sum()) * alpha)
+    return {
+        "statistic": z_obs,
+        "pvalue": acerbi_szekely_pvalue_from_null(z_obs, z_null),
+        "n_sim": int(z_null.size),
+        "null_q05": float(np.quantile(z_null, 0.05)),
+        "null_mean": float(np.mean(z_null)),
+    }
+
+
 def forecast_unit(arg: dict[str, Any]) -> dict[str, object]:
     """Rolling forecasts for one (asset, model) over all alphas; writes the NPZ itself."""
     from tailcheck.forecasters import make_forecaster, rolling_forecast
@@ -84,16 +138,7 @@ def forecast_unit(arg: dict[str, Any]) -> dict[str, object]:
     def on_block(t0: int, t1: int, blk: Any) -> None:
         if blk.draws is None:
             return
-        reg = turb[t0 - s : t1 - s]
-        for j in range(len(alphas)):
-            qj = blk.q[:, j][:, None]
-            ej = blk.e[:, j][:, None]
-            hit = blk.draws <= qj
-            contrib = np.where(hit, blk.draws / ej, 0.0)
-            for g, mask in enumerate((np.ones_like(reg, bool), reg == 0, reg == 1)):
-                if mask.any():
-                    acc_s[g, j] += contrib[mask].sum(axis=0)
-                    acc_n[g, j] += hit[mask].sum(axis=0)
+        accumulate_as_null(acc_s, acc_n, blk.q, blk.e, blk.draws, turb[t0 - s : t1 - s])
 
     t_start = time.perf_counter()
     out = rolling_forecast(
@@ -146,7 +191,7 @@ def _wilson(k: int, n: int, z: float = 1.959963984540054) -> tuple[float, float]
 
 def backtest_unit(arg: dict[str, Any]) -> dict[str, object]:
     """All backtests for one (asset, model, alpha), plus per-regime summaries."""
-    from tailcheck.es_tests import acerbi_szekely_pvalue_from_null, acerbi_szekely_z2, mcneil_frey
+    from tailcheck.es_tests import mcneil_frey
     from tailcheck.esr_backtest import esr_backtest
     from tailcheck.scoring import fz0_loss, mean_with_ci
     from tailcheck.var_tests import (
@@ -198,15 +243,7 @@ def backtest_unit(arg: dict[str, Any]) -> dict[str, object]:
     masks = {"full": np.ones(n, bool), "calm": turb == 0, "turbulent": turb == 1}
     if as_sum.size:
         for g, name in enumerate(REGIMES):
-            m = masks[name]
-            z_obs = acerbi_szekely_z2(r[m], q[m], e[m], alpha)
-            z_null = 1.0 - as_sum[g, j] / (m.sum() * alpha)
-            out[f"as_z2_{name}"] = {
-                "statistic": z_obs,
-                "pvalue": acerbi_szekely_pvalue_from_null(z_obs, z_null),
-                "n_sim": int(z_null.size),
-                "null_q05": float(np.quantile(z_null, 0.05)),
-            }
+            out[f"as_z2_{name}"] = as_z2_regime(r, q, e, alpha, masks[name], as_sum[g, j])
     else:
         out["as_z2_full"] = {
             "statistic": math.nan,
@@ -245,6 +282,7 @@ def compare_unit(arg: dict[str, Any]) -> dict[str, object]:
     out: dict[str, Any] = {
         "asset": arg["asset"],
         "alpha": alpha,
+        "models": sorted(losses),
         "mean_loss": frame.mean().to_dict(),
     }
     for size in c.get("mcs_size", [0.10, 0.25]):
@@ -276,16 +314,39 @@ def compare_unit(arg: dict[str, Any]) -> dict[str, object]:
     return out
 
 
+def study_inputs(cfg: Mapping[str, Any]) -> dict[str, Any]:
+    """What the config hash does not cover: package version and processed-data hashes."""
+    from tailcheck import __version__
+
+    cache = Path(cfg["data"]["cache_dir"])
+    return {
+        "tailcheck": __version__,
+        "data_sha256": {
+            str(a["id"]): series_sha256(load_returns(cache, str(a["id"])))
+            for a in cfg["data"]["assets"]
+        },
+    }
+
+
+def configured_workers(cfg: Mapping[str, Any], workers: int | None) -> int:
+    """``workers`` if given, else ``[run] workers`` from the config, else 4."""
+    return int(workers if workers is not None else cfg.get("run", {}).get("workers", 4))
+
+
 def run_study(
     cfg_path: Path,
-    workers: int = 4,
+    workers: int | None = None,
     force_new: bool = False,
     stages: tuple[str, ...] = ("forecast", "backtest", "compare"),
 ) -> Path:
     """Run (or resume) all stages; returns the run directory."""
     cfg = load_config(cfg_path)
     out_dir = Path(cfg["run"]["out_dir"])
-    store = UnitStore(out_dir, config_hash(cfg), force_new=force_new)
+    unknown = set(stages) - set(STAGES)
+    if unknown:
+        raise ValueError(f"unknown stage(s) {sorted(unknown)}; choose from {list(STAGES)}")
+    workers = configured_workers(cfg, workers)
+    store = UnitStore(out_dir, config_hash(cfg), force_new=force_new, inputs=study_inputs(cfg))
     gseed = int(cfg["seed"])
     assets = [a["id"] for a in cfg["data"]["assets"]]
     models = list(cfg["forecast"]["models"])
@@ -340,9 +401,18 @@ def run_study(
     if "compare" in stages:
         units = []
         for asset in assets:
-            avail = {m: npz(asset, m) for m in models if store.done(f"forecast__{asset}__{m}")}
-            if len(avail) < 2:
+            # Compare only once every configured forecaster for the asset is done: a compare
+            # unit is never recomputed, so running it on a partial model set would silently
+            # drop a model that only succeeds on a later rerun.
+            missing = [m for m in models if not store.done(f"forecast__{asset}__{m}")]
+            if missing:
+                store._append_log(
+                    f"compare__{asset} | skipped until forecasts finish: {', '.join(missing)}"
+                )
                 continue
+            if len(models) < 2:
+                continue
+            avail = {m: npz(asset, m) for m in models}
             for j, a in enumerate(alphas):
                 uid = f"compare__{asset}__{a}"
                 units.append(

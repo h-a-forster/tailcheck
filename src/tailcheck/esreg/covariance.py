@@ -52,15 +52,56 @@ def _phi6(u: Arr) -> Arr:
     return (u2**3 - 15 * u2**2 + 45 * u2 - 15) * np.exp(-u2 / 2) / math.sqrt(2 * math.pi)
 
 
-def bandwidth_sj(x: ArrayLike, nbins: int = 20_000) -> float:
+def _pair_distance_counts(xs: Arr, edges: Arr, block_elems: int = 4_000_000) -> NDArray[np.int64]:
+    """Histogram of all ``n (n - 1) / 2`` pairwise distances of sorted ``xs`` over ``edges``.
+
+    Rows are processed in blocks of at most ``block_elems`` differences, so memory is O(n)
+    rather than O(n^2); the counts are identical to histogramming all differences at once.
+    """
+    n = len(xs)
+    counts = np.zeros(len(edges) - 1, dtype=np.int64)
+    rows = max(1, block_elems // max(n, 1))
+    for i0 in range(0, n - 1, rows):
+        i1 = min(i0 + rows, n - 1)
+        # differences x[j] - x[i] for i in [i0, i1), j > i (non-negative because sorted)
+        cols = xs[i0 + 1 :]
+        diff = cols[None, :] - xs[i0:i1, None]
+        keep = np.arange(i0 + 1, n)[None, :] > np.arange(i0, i1)[:, None]
+        c, _ = np.histogram(diff[keep], edges)
+        counts += c
+    return counts
+
+
+def _binned_distance_counts(xs: Arr, nb: int) -> tuple[Arr, Arr]:
+    """Approximate pair-distance counts from ``nb`` equal-width bins of the data.
+
+    As in R's ``bw.SJ``: points are assigned to bins, and pairs are counted by bin
+    separation ``k`` (distance ``k * width``), ``c_k = sum_i n_i n_{i+k}`` for ``k >= 1`` and
+    ``sum_i n_i (n_i - 1) / 2`` at distance 0. O(n + nb log nb) time and O(nb) memory.
+    """
+    lo, hi = float(xs[0]), float(xs[-1])
+    width = (hi - lo) / nb
+    idx = np.minimum(((xs - lo) / width).astype(np.int64), nb - 1)
+    m = np.bincount(idx, minlength=nb).astype(np.float64)
+    size = 1 << int(np.ceil(np.log2(2 * nb)))
+    f = np.fft.rfft(m, size)
+    ac = np.fft.irfft(f * np.conj(f), size)[:nb]
+    cnt = np.rint(ac).astype(np.float64)
+    cnt[0] = float(np.sum(m * (m - 1) / 2))
+    return cnt, np.arange(nb, dtype=np.float64) * width
+
+
+def bandwidth_sj(x: ArrayLike, nbins: int = 20_000, max_exact: int = 10_000) -> float:
     """Sheather-Jones (1991) solve-the-equation bandwidth for a Gaussian KDE.
 
-    Pairwise sums over all ``n (n - 1) / 2`` absolute differences, counted once into
-    ``nbins`` fine bins (width ``max|d| / nbins``) so that each functional evaluation is
-    O(nbins); with 20,000 bins the result differs from the unbinned sum by about 1e-5
-    relative (R's ``bw.SJ`` bins the data range into 1,000 bins). The functional estimates
-    include the diagonal terms and divide by ``n (n - 1)`` (Wand and Jones 1995, sec. 3.6).
-    O(n^2) memory for the differences, so intended for at most a few thousand points.
+    For ``n <= max_exact`` the pairwise sums run over all ``n (n - 1) / 2`` absolute
+    differences, counted once into ``nbins`` fine bins (width ``max|d| / nbins``) so that each
+    functional evaluation is O(nbins); with 20,000 bins the result differs from the unbinned
+    sum by about 1e-5 relative. The differences are formed in row blocks, so memory is
+    O(n + nbins) and time O(n^2). Above ``max_exact`` the data themselves are first binned
+    into ``nbins`` bins and pairs are counted by bin separation (as R's ``bw.SJ`` does with
+    1,000 bins), which is O(n + nbins log nbins). The functional estimates include the
+    diagonal terms and divide by ``n (n - 1)`` (Wand and Jones 1995, sec. 3.6).
     """
     xa = np.asarray(x, dtype=np.float64)
     xa = xa[np.isfinite(xa)]
@@ -72,12 +113,15 @@ def bandwidth_sj(x: ArrayLike, nbins: int = 20_000) -> float:
     scale = min(sd, iqr / 1.349) if iqr > 0 else sd
     if scale <= 0:
         raise ValueError("data have zero spread")
-    i, j = np.triu_indices(n, k=1)
-    dist = np.abs(xa[i] - xa[j])
-    edges = np.linspace(0.0, float(dist.max()) * (1 + 1e-12) + 1e-300, nbins + 1)
-    counts, _ = np.histogram(dist, edges)
-    mid = 0.5 * (edges[1:] + edges[:-1])
-    del dist, i, j
+    xs = np.sort(xa)
+    if n <= max_exact:
+        dmax = float(xs[-1] - xs[0])  # equals max |x_i - x_j| exactly
+        edges = np.linspace(0.0, dmax * (1 + 1e-12) + 1e-300, nbins + 1)
+        counts = _pair_distance_counts(xs, edges)
+        mid = 0.5 * (edges[1:] + edges[:-1])
+    else:
+        counts_f, mid = _binned_distance_counts(xs, nbins)
+        counts = counts_f
     keep = counts > 0
     cnt, d = counts[keep].astype(np.float64), mid[keep]
 

@@ -383,13 +383,21 @@ Formulas:
 
 ### 4.6 `checkpoint` (M1)
 
-`UnitStore(root, config_hash)`: `root/manifest.json` holds the config hash, the package
-version, the Python/numpy/scipy/arch versions and the start time. A mismatched hash raises
-unless `--force-new`. Each unit is written to `root/units/<safe_id>.json` (or `.npz` for
+`UnitStore(root, config_hash, inputs=...)`: `root/manifest.json` holds the config hash, the
+`inputs` the hash does not cover (package version; for the study, the SHA-256 of each
+processed return series), a hash of the package source, the Python/numpy/scipy/arch versions
+and the start time. A mismatched config hash or `inputs` raises unless `--force-new`, so a
+resume never mixes units computed on different data. A changed source hash only warns (and
+writes a `progress.log` line), because documentation edits should not invalidate a long run.
+Reports open the store read-only: they create nothing and fail cleanly when there is no run. Each unit is written to `root/units/<safe_id>.json` (or `.npz` for
 arrays) through a temporary file and `os.replace`. `done(id)` checks existence and a
 `complete: true` field. A progress line is appended to `root/progress.log`:
 `ISO time | unit | seconds | done/total`. Runners take the todo list, skip units that are
-done, and submit the rest to the pool.
+done, and submit the rest to the pool. Worker processes run with one BLAS/OpenMP thread: the
+thread variables are set in the parent while the pool runs (spawned children inherit them
+before numpy loads) and the initializer also calls `threadpoolctl.threadpool_limits(1)`.
+The study's compare unit for an asset runs only after every configured forecaster for that
+asset is done, because a finished unit is never recomputed.
 
 ## 5. Study design (M7, M9)
 
@@ -437,7 +445,8 @@ done, and submit the rest to the pool.
   `uv run tailcheck study run --config configs/study.toml --workers 4`,
   `uv run tailcheck study report --config configs/study.toml` (writes `results/study-v1/` and
   `REPORT.md`). Full size: the same commands with `configs/study_full.toml` (daily refits,
-  bootstrap ESR with B = 999; roughly 10-20 CPU-hours, resumable).
+  bootstrap ESR with B = 999; projected at roughly 20-30 CPU-hours, see the config header;
+  resumable).
 
 ## 6. Monte Carlo validation (M8)
 
@@ -453,22 +462,35 @@ done, and submit the rest to the pool.
 - `normal-tails`: true sigma_t with normal quantile and ES. VaR is nearly right at 2.5%
   (-1.960 vs -1.991), ES is too thin (-2.338 vs -2.728). VaR tests should have little power
   here and ES tests should have power. This is the key diagnostic contrast.
-- `slow-vol`: constant sigma = 1 with the right t5 shape. Unconditional coverage is right but
-  clustering is ignored, so DQ, Christoffersen and strict ESR should have power and Kupiec
-  should not.
+- `unconditional` (called `slow-vol` before 0.1.0): constant sigma = 1 with the t5 shape, on
+  the same GARCH(1,1) data (alpha 0.10, beta 0.85, volatility half-life about 13.5 days); no
+  separate slowly varying volatility process. The unconditional standard deviation is right
+  (omega / (1 - alpha - beta) = 1), but clustering is ignored, so DQ, Christoffersen and
+  strict ESR should have power. Kupiec has some power too: the unconditional distribution of
+  GARCH-t returns has fatter tails than t5, so unconditional coverage is not exact.
 
-**Output.** For each (test, DGP, n, alpha): rejection rate at 5% with a Wilson 95% interval,
+**Acerbi-Szekely null.** The null sample (`as_n_sim` paths) is drawn afresh for every chunk
+of replications, from a seed derived from the chunk id. Within a chunk its Monte Carlo error
+is shared by the replications, so the Wilson interval (which assumes independent
+replications) slightly understates the uncertainty; across chunks the error averages out.
+Before 0.1.0 one null sample served the whole cell, which shifted a cell's true size by
+about +-0.5 percentage points (1 sd at `as_n_sim` = 2000), not covered by its interval.
+
+**Output.** For each (test, DGP, n, alpha): rejection rate at the configured `level` with a
+Wilson 95% interval,
 the number of replications, the failure count (fits that errored count as failures, never
 silently dropped), and median runtime. Size is flagged "distorted" if the Wilson interval
-lies entirely outside [0.03, 0.07]. The ESR asymptotic tests are known to be oversized in
+lies entirely outside [0.6 level, 1.4 level] ([0.03, 0.07] at 5%). The ESR asymptotic tests are known to be oversized in
 small samples (Bayer and Dimitriadis 2022 recommend the bootstrap there). Reproducing that is
 expected, not a bug.
 
 **Profiles.** `configs/mc_quick.toml` (default; at most 45 CPU-minutes, about 12 minutes on 4
-workers) and `configs/mc_full.toml` (roughly 15-25 CPU-hours). Estimated quick budget:
+workers) and `configs/mc_full.toml` (projected at roughly 35-45 CPU-hours; see its
+header). Estimated quick budget:
 ESR about 2,300 fits at about 1 s (Nelder-Mead ILS plus 4 LPs measured at about 1.3 s for
 n = 2000 at scaffold time); cheap tests about 120 s, since all cheap tests share each
-replication and the AS null is simulated once per cell. M8 starts with a timing calibration
+replication (the AS null was planned once per cell; it is now drawn once per chunk, see
+above). M8 starts with a timing calibration
 on 10 replications per cell type. If the projection exceeds 45 CPU-minutes, lower
 `reps_power` first and never take `reps_size` below 200. The results file records the reps
 actually run. Units: (cell, chunk of 50 replications) through `UnitStore`.
@@ -656,7 +678,16 @@ Recorded when the plan above and the code differ:
   t0, t1, alphas, n_draws, rng)` instead of a per-day `forecast`: one fit serves both alphas
   and a whole refit block. `hs` rolls its window daily (it has no parameters to refit).
 - **Sheather-Jones bandwidth.** Pair distances are counted once into 20,000 bins; this
-  differs from the exact sum by about 1e-5 relative and is 8 times faster at n = 2000.
+  differs from the exact sum by about 1e-5 relative and is 8 times faster at n = 2000. The
+  differences are formed in row blocks (O(n) memory, identical counts). Above n = 10,000 the
+  data are binned first and pairs counted by bin separation, as R's `bw.SJ` does (about 3e-5
+  relative difference at n = 8000).
+- **FZ0 objective.** Since commit `d097f0f` the estimator evaluates the (G1 = 0,
+  G2 = -1/z) loss through a written-out FZ0 expression. It is the same function, but
+  floating-point differences change Nelder-Mead paths: p-values move by up to about 50%
+  relative in the most extreme cells (for example 5.8e-5 vs 3.7e-5), because the
+  location-scale covariance step is numerically sensitive. All committed results were
+  regenerated after this change.
 - **`scl_sp` truncated moments.** Closed-form Gaussian-kernel integrals instead of a
   1,000-point trapezoidal grid (agrees with `vcovA` to 0.4% on the fixtures).
 - **iid sparsity.** Koenker (1994) estimator; about 22% above `esreg`'s on the fixture
@@ -672,3 +703,8 @@ Recorded when the plan above and the code differ:
   (`results/mc-quick/calibration.json`).
 - **Study extras.** Each backtest unit also stores the strict-ESR p-value with `esreg`'s G2''
   so the effect of the discrepancy on real data is visible.
+- **Config keys.** `[backtest] as_statistic` and `[esr] bootstrap` were removed (only Z2 is
+  computed in the study, and the Monte Carlo runner has no bootstrap ESR path); `[run]
+  workers` is now the default for `--workers`.
+- **DGP name.** The `slow-vol` power DGP is called `unconditional`: it is constant-sigma t5
+  forecasts on the `garch-t5` data, not a separate slowly varying volatility process.

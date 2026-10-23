@@ -17,7 +17,7 @@ import numpy as np
 
 from tailcheck.checkpoint import UnitStore, config_hash, run_units
 from tailcheck.montecarlo.dgp import as_null, simulate
-from tailcheck.study.runner import load_config, unit_seed
+from tailcheck.study.runner import configured_workers, load_config, unit_seed
 
 
 def _chunks(reps: int, chunk: int) -> list[int]:
@@ -156,11 +156,14 @@ def build_units(cfg: dict[str, Any]) -> list[tuple[str, Any]]:
         reps = int(ch["reps_size"] if dgp in ch["dgps_size"] else ch["reps_power"])
         for n in ch["n"]:
             for a in ch["alphas"]:
-                null_seeds = {
-                    law: unit_seed(gseed, f"asnull|{law}|{n}|{a}") for law in ("t5", "normal")
-                }
                 for k, r in enumerate(_chunks(reps, chunk)):
                     uid = f"cheap|{dgp}|{n}|{a}|{k}"
+                    # A fresh Acerbi-Szekely null sample per chunk: its Monte Carlo error is
+                    # then shared by the replications of one chunk only, not by the whole
+                    # cell, and averages out across chunks.
+                    null_seeds = {
+                        law: unit_seed(gseed, f"asnull|{law}|{uid}") for law in ("t5", "normal")
+                    }
                     units.append(
                         (
                             uid,
@@ -215,9 +218,15 @@ def _dispatch(arg: dict[str, Any]) -> dict[str, object]:
     return esr_unit(arg) if "versions" in arg else cheap_unit(arg)
 
 
-def run_mc(cfg_path: Path, workers: int = 4, force_new: bool = False) -> Path:
+def run_mc(cfg_path: Path, workers: int | None = None, force_new: bool = False) -> Path:
+    from tailcheck import __version__
+
     cfg = load_config(cfg_path)
     out_dir = Path(cfg["run"]["out_dir"])
-    store = UnitStore(out_dir, config_hash(cfg), force_new=force_new)
-    run_units(store, build_units(cfg), _dispatch, workers=workers, on_error="log")
+    store = UnitStore(
+        out_dir, config_hash(cfg), force_new=force_new, inputs={"tailcheck": __version__}
+    )
+    run_units(
+        store, build_units(cfg), _dispatch, workers=configured_workers(cfg, workers), on_error="log"
+    )
     return out_dir

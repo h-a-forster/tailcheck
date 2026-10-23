@@ -17,7 +17,7 @@ from tailcheck.dist import draw_std_t, normal_var_es, std_t_var_es
 
 Arr = NDArray[np.float64]
 SIZE_DGPS = ("iid-t5", "garch-t5", "iid-normal")
-POWER_DGPS = ("scale-0.85", "scale-0.70", "normal-tails", "slow-vol")
+POWER_DGPS = ("scale-0.85", "scale-0.70", "normal-tails", "unconditional")
 OMEGA, A1, B1, NU = 0.05, 0.10, 0.85, 5.0
 BURN = 500
 
@@ -62,7 +62,7 @@ def simulate(dgp: str, n: int, alpha: float, rng: np.random.Generator) -> Sample
     if dgp == "normal-tails":
         qn, en = normal_var_es(alpha)
         return Sample(r, qn * s, en * s, s, "normal")
-    if dgp == "slow-vol":
+    if dgp == "unconditional":  # constant-sigma t5 forecasts on the same GARCH data
         ones = np.ones(n)
         return Sample(r, qt * ones, et * ones, ones, "t5")
     raise ValueError(f"unknown DGP {dgp!r}")

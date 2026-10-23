@@ -29,7 +29,7 @@ def test_simulate_forecast_sets() -> None:
     n = simulate("normal-tails", 100, 0.025, rng)
     np.testing.assert_allclose(n.e / n.sigma, en)
     assert n.law == "normal"
-    v = simulate("slow-vol", 100, 0.025, rng)
+    v = simulate("unconditional", 100, 0.025, rng)
     assert np.all(v.q == qt) and np.all(v.sigma == 1)
     with pytest.raises(ValueError):
         simulate("nope", 10, 0.025, rng)
@@ -72,7 +72,6 @@ dgps_power = []
 reps_size = 2
 reps_power = 0
 chunk = 2
-bootstrap = 0
 [run]
 workers = 1
 out_dir = "{(tmp / "runs").as_posix()}"
@@ -97,3 +96,19 @@ def test_runner_and_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     out = pd.read_csv(tmp_path / "results" / "mc-test" / "size_power.csv")
     assert len(out) == len(df)
     assert (tmp_path / "results" / "mc-test" / "size_power.md").exists()
+
+
+def test_as_null_seed_differs_per_chunk(tmp_path: Path) -> None:
+    from tailcheck.study.runner import load_config
+
+    units = [u for u in build_units(load_config(_cfg(tmp_path))) if u[0].startswith("cheap|")]
+    cell = [a for uid, a in units if uid.startswith("cheap|iid-t5|250|0.025|")]
+    assert len(cell) == 2
+    assert cell[0]["null_seeds"]["t5"] != cell[1]["null_seeds"]["t5"]
+
+
+def test_distortion_band_follows_level() -> None:
+    from tailcheck.montecarlo.report import distortion_band
+
+    assert distortion_band(0.05) == pytest.approx((0.03, 0.07))
+    assert distortion_band(0.10) == pytest.approx((0.06, 0.14))

@@ -1,5 +1,9 @@
-# Monte Carlo size/power validation, full-size profile. Expect roughly 15-25 CPU-hours
-# (4-6 hours wall with 4 workers). Resumable: completed chunks are skipped on rerun.
+# Monte Carlo size/power validation, full-size profile. Projected (not run) at roughly 35-45
+# CPU-hours (9-12 hours wall with 4 workers): 2,900 ESR replications per (n, alpha) with
+# three versions take about 2.0, 2.3, 3.8 and 12.6 s per replication at n = 500, 1000, 2000
+# and 5000 (about 33 CPU-hours), plus about 5-8 CPU-hours for the other tests and the
+# per-chunk Acerbi-Szekely null samples. Resumable: completed chunks are skipped on rerun.
+# A bootstrap ESR size study is not part of this runner (DESIGN 6.4).
 name = "mc-full"
 seed = 20261023
 level = 0.05
@@ -10,7 +14,7 @@ tests = ["kupiec", "christoffersen_ind", "christoffersen_cc", "dq", "as_z1", "as
 n = [250, 500, 1000, 2000, 5000]
 alphas = [0.01, 0.025, 0.05]
 dgps_size = ["iid-t5", "garch-t5", "iid-normal"]
-dgps_power = ["scale-0.85", "scale-0.70", "normal-tails", "slow-vol"]
+dgps_power = ["scale-0.85", "scale-0.70", "normal-tails", "unconditional"]
 reps_size = 10000
 reps_power = 2000
 as_n_sim = 5000
@@ -22,10 +26,9 @@ n = [500, 1000, 2000, 5000]
 alphas = [0.01, 0.025]
 extra_cells = []
 dgps_size = ["garch-t5", "iid-t5"]
-dgps_power = ["scale-0.85", "normal-tails", "slow-vol"]
+dgps_power = ["scale-0.85", "normal-tails", "unconditional"]
 reps_size = 1000
 reps_power = 300
-bootstrap = 0                       # bootstrap ESR p-values: separate small run, see DESIGN 6.4
 
 [run]
 workers = 4

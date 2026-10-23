@@ -1,5 +1,8 @@
 # Forecaster bake-off, full-size configuration (daily refits, bootstrap ESR p-values).
-# Expect roughly 10-20 CPU-hours; run with workers = 4.
+# Projected (not run) at roughly 20-30 CPU-hours, 5-8 hours wall with workers = 4: the ESR
+# bootstrap costs about 0.45 s per replicate at n = 1440, so 3 versions x 999 replicates take
+# about 20-25 minutes per cell (50 cells, about 20 CPU-hours), and daily refits multiply the
+# 13 CPU-minutes of quick-profile forecasting by up to 21 (up to about 4.5 CPU-hours).
 name = "study-v1-full"
 seed = 20261023
 
@@ -50,7 +53,6 @@ caviar_best_starts = 10
 esr_versions = [1, 2, 3]
 esr_bootstrap = 999
 mcneil_frey_boot = 2000
-as_statistic = "z2"
 dq_lags = 4
 
 [compare]

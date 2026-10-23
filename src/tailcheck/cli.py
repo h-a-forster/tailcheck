@@ -9,6 +9,19 @@ from pathlib import Path
 
 from tailcheck import __version__
 
+STAGES = ("forecast", "backtest", "compare")
+WORKERS_HELP = "worker processes (default: [run] workers in the config, else 4; capped at 4)"
+
+
+def _stages(text: str) -> tuple[str, ...]:
+    parts = tuple(p.strip() for p in text.split(",") if p.strip())
+    bad = [p for p in parts if p not in STAGES]
+    if bad or not parts:
+        raise argparse.ArgumentTypeError(
+            f"unknown stage(s) {bad or [text]}; choose from {','.join(STAGES)}"
+        )
+    return parts
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -34,9 +47,14 @@ def build_parser() -> argparse.ArgumentParser:
     study_sub = study.add_subparsers(dest="action", required=True)
     sr = study_sub.add_parser("run")
     sr.add_argument("--config", type=Path, required=True)
-    sr.add_argument("--workers", type=int, default=4)
+    sr.add_argument("--workers", type=int, default=None, help=WORKERS_HELP)
     sr.add_argument("--force-new", action="store_true")
-    sr.add_argument("--stages", default="forecast,backtest,compare")
+    sr.add_argument(
+        "--stages",
+        type=_stages,
+        default=STAGES,
+        help="comma-separated subset of " + ",".join(STAGES) + " (default: all)",
+    )
     srep = study_sub.add_parser("report")
     srep.add_argument("--config", type=Path, required=True)
 
@@ -44,7 +62,7 @@ def build_parser() -> argparse.ArgumentParser:
     mc_sub = mc.add_subparsers(dest="action", required=True)
     mr = mc_sub.add_parser("run")
     mr.add_argument("--config", type=Path, required=True)
-    mr.add_argument("--workers", type=int, default=4)
+    mr.add_argument("--workers", type=int, default=None, help=WORKERS_HELP)
     mr.add_argument("--force-new", action="store_true")
     mrep = mc_sub.add_parser("report")
     mrep.add_argument("--config", type=Path, required=True)
@@ -61,6 +79,7 @@ def cmd_backtest(args: argparse.Namespace) -> int:
     import numpy as np
     import pandas as pd
 
+    from tailcheck._validation import as_float_1d, check_alpha, check_same_length
     from tailcheck.es_tests import mcneil_frey
     from tailcheck.esr_backtest import esr_backtest
     from tailcheck.scoring import fz0_loss, mean_with_ci
@@ -77,11 +96,19 @@ def cmd_backtest(args: argparse.Namespace) -> int:
     if missing:
         print(f"error: CSV lacks columns {sorted(missing)}", file=sys.stderr)
         return 2
-    r, q, e = (df[c].to_numpy(dtype=float) for c in ("r", "q", "e"))
-    sigma = df["sigma"].to_numpy(dtype=float) if "sigma" in df else None
-    a = args.alpha
-    hits = int(np.sum(r <= q))
-    print(f"n = {len(r)}, alpha = {a}, hits = {hits} (expected {a * len(r):.1f})")
+    cols = ["r", "q", "e"] + (["sigma"] if "sigma" in df else [])
+    arrays = {}
+    for c in cols:
+        try:
+            arrays[c] = pd.to_numeric(df[c], errors="raise").to_numpy(dtype=float)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"column {c!r} is not numeric: {exc}") from exc
+        arrays[c] = as_float_1d(arrays[c], c)  # rejects NaN / infinite values
+    check_same_length([arrays[c] for c in cols], cols)
+    r, q, e = arrays["r"], arrays["q"], arrays["e"]
+    sigma = arrays.get("sigma")
+    a = check_alpha(args.alpha)
+    # compute everything before printing, so bad input fails with a clean error
     results = [
         kupiec_pof(r, q, a),
         christoffersen_independence(r, q, a),
@@ -91,6 +118,9 @@ def cmd_backtest(args: argparse.Namespace) -> int:
     ]
     if not args.no_esr:
         results += [esr_backtest(r, e, a, v, q=q, seed=args.seed) for v in (1, 2, 3)]  # type: ignore[arg-type]
+    tl = traffic_light(r, q, a)
+    hits = int(np.sum(r <= q))
+    print(f"n = {len(r)}, alpha = {a}, hits = {hits} (expected {a * len(r):.1f})")
     print(f"{'test':<22}{'statistic':>12}{'p-value':>12}  alternative")
     for res in results:
         note = f"  ({res.details['reason']})" if "reason" in res.details else ""
@@ -98,7 +128,6 @@ def cmd_backtest(args: argparse.Namespace) -> int:
             f"{res.test:<22}{_fmt(res.statistic):>12}{_fmt(res.pvalue):>12}"
             f"  {res.alternative}{note}"
         )
-    tl = traffic_light(r, q, a)
     print(f"traffic light: {tl.zone} (binomial CDF {tl.cumulative_probability:.4f})")
     if np.all(e <= q) and np.all(q < 0):
         ci = mean_with_ci(fz0_loss(r, q, e, a))
@@ -112,6 +141,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.command is None:
         parser.print_help()
         return 0
+    from tailcheck.checkpoint import ConfigMismatchError
+    from tailcheck.data import DataError
+
+    try:
+        return _dispatch(args)
+    except (ValueError, OSError, DataError, ConfigMismatchError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+
+def _dispatch(args: argparse.Namespace) -> int:
     if args.command == "backtest":
         return cmd_backtest(args)
     if args.command == "data":
@@ -139,7 +179,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.config,
                 workers=args.workers,
                 force_new=args.force_new,
-                stages=tuple(args.stages.split(",")),
+                stages=args.stages,
             )
             print(f"run directory: {out}")
             return 0

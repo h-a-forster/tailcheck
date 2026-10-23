@@ -19,8 +19,11 @@ tailcheck is a local statistics library and command-line tool.
 - **No credentials.** tailcheck needs no API keys. The data downloaders fetch public files
   over HTTPS from `data.binance.vision` and `fred.stlouisfed.org` and nothing else.
 - **Downloaded data is untrusted input.** Parsers validate column counts, types, dates and
-  finiteness, and reject files that do not match the expected layout. Downloaded archives are
-  read in memory; nothing from them is executed.
+  finiteness (non-finite or non-positive prices are rejected), and reject files that do not
+  match the expected layout. Binance archives are verified against their published SHA-256
+  checksums; FRED publishes none, so its CSV is parsed and validated before it is cached.
+  Downloads are written to the cache atomically. Downloaded archives are read in memory;
+  nothing from them is executed.
 - **Cache and run directories** hold market data and intermediate results only. They are
   local, gitignored, and safe to delete.
 - **The R fixture runner** (`scripts/r_fixtures/`) is a developer tool. It installs the `webr`
