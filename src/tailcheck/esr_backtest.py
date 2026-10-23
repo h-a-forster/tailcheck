@@ -114,12 +114,14 @@ def esr_backtest(
             fit, sparsity, sigma_est, misspec, _esreg_compat_g2pp=_esreg_compat_g2pp
         )
         cov_e = cov[kq:, kq:]
+        if np.linalg.eigvalsh(cov_e).min() <= 0:
+            return undefined("ES covariance not positive definite", {"coef": fit.coef.tolist()})
         stat = _stat(version, fit.coef_e, cov_e)
     except (ValueError, RuntimeError, np.linalg.LinAlgError, ZeroDivisionError) as exc:
         return undefined(f"covariance failed: {exc}", {"coef": fit.coef.tolist()})
     if not math.isfinite(stat):
         return undefined("non-finite statistic", {"coef": fit.coef.tolist()})
-    se = np.sqrt(np.diag(cov))
+    se = np.sqrt(np.maximum(np.diag(cov), 0.0))
     details: dict[str, Any] = {
         "coef_q": fit.coef_q.tolist(),
         "coef_e": fit.coef_e.tolist(),
@@ -186,6 +188,8 @@ def _bootstrap(
             cov_b, _ = vcov_details(fb, sparsity, sigma_est, misspec)
             d = fb.coef_e - fit.coef_e
             ce = cov_b[kq:, kq:]
+            if np.linalg.eigvalsh(ce).min() <= 0:
+                raise ValueError("bootstrap covariance not positive definite")
             t = (
                 float(d @ np.linalg.solve(ce, d))
                 if version in (1, 2)

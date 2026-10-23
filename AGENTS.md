@@ -121,5 +121,9 @@ Done:
   agree within 0.006 (3 fast cases in CI, the rest `slow`).
 - M5: `scoring` (FZ0, DM with NW/HLN, `mean_with_ci`, MCS wrapper on arch).
 
-Next: M6 forecasters, M7 data + study forecast stage, M8 Monte Carlo, M9 study report,
+- M6: forecasters (`hs` rolling daily, `gjr-t`, `fhs`, `evt-pot` with own GJR filter
+  matching arch to 1e-8, `caviar-sav`) and `rolling_forecast` driver; no-look-ahead test
+  per model. ESR backtest returns nan when the ES covariance is not positive definite.
+
+Next: M7 data + study forecast stage, M8 Monte Carlo, M9 study report,
 M10 CLI/README. Follow DESIGN section 9.
