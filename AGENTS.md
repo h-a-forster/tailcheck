@@ -104,6 +104,9 @@ Done:
 - Research checks (2026-10-23): Stooq CSV downloads are blocked by a JavaScript bot check, so
   FRED is used instead. Binance daily klines switch from millisecond to microsecond
   timestamps in 2025. webR runs `esreg` 0.6.2 / `esback` 0.3.1 under Node on this machine.
+- M3: `es_tests` (AS Z1/Z2 simulation test, `location_scale_simulator`, McNeil-Frey
+  bootstrap-t) and `dist` (normal and standardized-t VaR/ES). Z2 null 5% quantile matches
+  -0.70; MF one-sided test is conservative with t5 residuals (about 3% at 5%).
 - M2: `var_tests` (Kupiec, Christoffersen ind/cc, DQ via lstsq with rank df, Basel traffic
   light) with all DESIGN 4.1 reference values. Christoffersen ind is conservative at
   n=500, alpha=0.025 (1.25% rejections at 5%), as expected with rare hits.
@@ -114,4 +117,4 @@ Open items:
 - Verify in M4b: `esreg` 0.6.2's `G2_prime_prime` for G2 type 1 returns `-1/z^3` where
   calculus gives `-2/z^3` (misspecification term of Lambda_22 only). See DESIGN 4.3.1.
 
-Next: M3 (`es_tests`). Follow the milestone table in DESIGN section 9.
+Next: M4a (`esreg` loss, G functions, quantile regression, estimator). Follow the milestone table in DESIGN section 9.
