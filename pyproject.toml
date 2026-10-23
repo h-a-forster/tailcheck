@@ -1,0 +1,75 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tailcheck"
+version = "0.1.0.dev0"
+description = "VaR and Expected Shortfall backtests in Python (Kupiec, Christoffersen, dynamic quantile, Acerbi-Szekely, McNeil-Frey, Bayer-Dimitriadis ES regression), FZ0 scoring and model confidence sets, each checked for size and power by Monte Carlo."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+authors = [{ name = "tailcheck contributors" }]
+keywords = [
+    "value-at-risk", "expected-shortfall", "backtesting", "risk-management", "frtb",
+    "quantile-regression", "scoring-rules", "model-confidence-set", "garch", "quant",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Typing :: Typed",
+]
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pandas>=2.1",
+    "arch>=7.0",
+]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.8"]
+
+[project.urls]
+Homepage = "https://github.com/h-a-forster/tailcheck"
+Documentation = "https://github.com/h-a-forster/tailcheck/tree/main/docs"
+Issues = "https://github.com/h-a-forster/tailcheck/issues"
+Changelog = "https://github.com/h-a-forster/tailcheck/blob/main/CHANGELOG.md"
+
+[project.scripts]
+tailcheck = "tailcheck.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "matplotlib>=3.8"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tailcheck"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/tailcheck", "tests", "docs", "configs", "scripts", "README.md", "LICENSE",
+    "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "CITATION.cff",
+]
+exclude = ["scripts/r_fixtures/node_modules"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["scripts/r_fixtures/node_modules"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]

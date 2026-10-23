@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+tmp/
+.env
+
+# Downloaded market data and long-run outputs (never committed; small derived results go in results/)
+data/
+cache/
+runs/
+
+# R reference-fixture tooling (webR via Node)
+node_modules/

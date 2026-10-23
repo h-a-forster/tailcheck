@@ -1,0 +1,10 @@
+{
+  "name": "tailcheck-r-fixtures",
+  "private": true,
+  "description": "Developer tool: runs R scripts in webR (R compiled to WebAssembly) to produce reference fixtures from the R packages esreg and esback.",
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "webr": "0.6.0"
+  }
+}

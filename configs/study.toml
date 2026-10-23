@@ -1,0 +1,70 @@
+# Forecaster bake-off, default ("quick") configuration. See docs/DESIGN.md section 5.
+# Full-size variant: configs/study_full.toml (daily refits). Budget: <= 45 CPU-minutes.
+name = "study-v1"
+seed = 20261023
+
+[data]
+cache_dir = "data"                 # gitignored
+end = "2026-09-30"                 # fixed snapshot end date for reproducibility
+
+[[data.assets]]
+id = "BTCUSDT"
+source = "binance"
+class = "crypto"
+start = "2017-08-17"
+
+[[data.assets]]
+id = "ETHUSDT"
+source = "binance"
+class = "crypto"
+start = "2017-08-17"
+
+[[data.assets]]
+id = "SP500"
+source = "fred"
+class = "equity"
+
+[[data.assets]]
+id = "NASDAQCOM"
+source = "fred"
+class = "equity"
+
+[[data.assets]]
+id = "NIKKEI225"
+source = "fred"
+class = "equity"
+
+[forecast]
+alphas = [0.01, 0.025]
+window = 1000                      # estimation window, observations
+oos_start = "2021-01-01"
+oos_end = "2026-09-30"
+refit_every = 21                   # refit parameters every 21 observations, filter daily
+models = ["hs", "gjr-t", "fhs", "evt-pot", "caviar-sav"]
+n_draws = 2000                     # predictive draws per day for the Acerbi-Szekely test
+evt_tail_fraction = 0.10           # k = 100 of 1000 standardized losses
+caviar_random_starts = 2000
+caviar_best_starts = 10
+
+[backtest]
+esr_versions = [1, 2, 3]
+esr_bootstrap = 0                  # asymptotic p-values only in the default run
+mcneil_frey_boot = 2000
+as_statistic = "z2"
+dq_lags = 4
+
+[compare]
+mcs_size = [0.10, 0.25]
+mcs_reps = 10000
+mcs_method = "R"
+mcs_block_size = 10                # stationary bootstrap mean block length
+dm_small_sample = true
+
+[regimes]
+# Ex-ante label: trailing 63-observation realized volatility (known at t-1) above or below
+# its out-of-sample median, per asset.
+vol_lookback = 63
+
+[run]
+workers = 4                        # hard cap: 4 processes
+out_dir = "runs/study-v1"          # gitignored; small derived results are copied to results/

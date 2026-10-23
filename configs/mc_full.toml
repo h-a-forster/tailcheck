@@ -1,0 +1,32 @@
+# Monte Carlo size/power validation, full-size profile. Expect roughly 15-25 CPU-hours
+# (4-6 hours wall with 4 workers). Resumable: completed chunks are skipped on rerun.
+name = "mc-full"
+seed = 20261023
+level = 0.05
+chunk = 50
+
+[cheap]
+tests = ["kupiec", "christoffersen_ind", "christoffersen_cc", "dq", "as_z1", "as_z2", "mcneil_frey"]
+n = [250, 500, 1000, 2000, 5000]
+alphas = [0.01, 0.025, 0.05]
+dgps_size = ["iid-t5", "garch-t5", "iid-normal"]
+dgps_power = ["scale-0.85", "scale-0.70", "normal-tails", "slow-vol"]
+reps_size = 10000
+reps_power = 2000
+as_n_sim = 5000
+mcneil_frey_boot = 1999
+
+[esr]
+versions = [1, 2, 3]
+n = [500, 1000, 2000, 5000]
+alphas = [0.01, 0.025]
+extra_cells = []
+dgps_size = ["garch-t5", "iid-t5"]
+dgps_power = ["scale-0.85", "normal-tails", "slow-vol"]
+reps_size = 1000
+reps_power = 300
+bootstrap = 0                       # bootstrap ESR p-values: separate small run, see DESIGN 6.4
+
+[run]
+workers = 4
+out_dir = "runs/mc-full"

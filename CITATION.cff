@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: "If you use tailcheck, please cite it as below."
+title: tailcheck
+abstract: >-
+  VaR and Expected Shortfall backtests in Python, including a port of the
+  Bayer-Dimitriadis ES regression backtests, FZ0 scoring and model confidence
+  sets, with Monte Carlo checks of size and power for every test.
+type: software
+authors:
+  - name: tailcheck contributors
+repository-code: "https://github.com/h-a-forster/tailcheck"
+license: MIT
+version: 0.1.0.dev0
+keywords:
+  - value-at-risk
+  - expected-shortfall
+  - backtesting
+  - quantile regression
+references:
+  - type: article
+    authors:
+      - family-names: Bayer
+        given-names: Sebastian
+      - family-names: Dimitriadis
+        given-names: Timo
+    title: Regression-based expected shortfall backtesting
+    journal: Journal of Financial Econometrics
+    year: 2022
+    doi: 10.1093/jjfinec/nbaa013
+  - type: article
+    authors:
+      - family-names: Dimitriadis
+        given-names: Timo
+      - family-names: Bayer
+        given-names: Sebastian
+    title: A joint quantile and expected shortfall regression framework
+    journal: Electronic Journal of Statistics
+    year: 2019
+    doi: 10.1214/19-EJS1560
