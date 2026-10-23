@@ -10,7 +10,7 @@ authors:
   - name: tailcheck contributors
 repository-code: "https://github.com/h-a-forster/tailcheck"
 license: MIT
-version: 0.1.0.dev0
+version: 0.1.0
 keywords:
   - value-at-risk
   - expected-shortfall

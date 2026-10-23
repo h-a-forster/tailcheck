@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tailcheck"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "VaR and Expected Shortfall backtests in Python (Kupiec, Christoffersen, dynamic quantile, Acerbi-Szekely, McNeil-Frey, Bayer-Dimitriadis ES regression), FZ0 scoring and model confidence sets, each checked for size and power by Monte Carlo."
 readme = "README.md"
 license = "MIT"

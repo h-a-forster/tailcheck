@@ -88,8 +88,8 @@ christoffersen_ind          1.1817      0.2770  two-sided
 christoffersen_cc           1.2232      0.5425  two-sided
 dynamic_quantile            2.8109      0.8322  two-sided
 mcneil_frey                 2.2968      0.9200  less
-esr_v1                      3.0751      0.2149  two-sided
-esr_v2                      3.0748      0.2149  two-sided
+esr_v1                      3.0744      0.2150  two-sided
+esr_v2                      3.0751      0.2149  two-sided
 esr_v3                      1.5024      0.9335  less
 traffic light: green (binomial CDF 0.4724)
 mean FZ0 loss: 0.8074 [0.6889, 0.9260] (95% NW)
@@ -129,7 +129,7 @@ stopped; progress goes to `runs/<name>/progress.log`. Full-size configurations
 ```sh
 uv sync --group dev
 uv run pytest                 # fast suite (as in CI)
-uv run pytest --runslow       # plus the slow checks (all 36 ESR fixtures, small MC)
+uv run pytest --runslow       # plus the slow checks (all 36 ESR fixtures)
 uv run ruff check . && uv run ruff format --check .
 ```
 

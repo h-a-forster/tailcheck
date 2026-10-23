@@ -42,3 +42,10 @@ First feature-complete version. Not tagged and not on PyPI.
   It changes misspecification-robust ESR p-values (by up to 0.25 on the reference fixtures).
   Minimal repro: `scripts/r_fixtures/g2pp_repro.R`; analysis in `docs/esreg-covariance.md`.
   tailcheck uses the correct formula.
+
+### Known limitations
+
+- In the quick Monte Carlo the one-sided ESR v3 test (asymptotic) is conservative (0-1%
+  rejections at 5%), Christoffersen independence is undersized and the dynamic quantile
+  test is oversized at alpha = 1%. See `REPORT.md` section 3.
+- Only the quick study and Monte Carlo profiles have been run.

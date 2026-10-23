@@ -1,0 +1,223 @@
+{
+  "cells": 231,
+  "total_replications": 296280,
+  "distorted_size_cells": [
+    {
+      "test": "christoffersen_cc",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.005
+    },
+    {
+      "test": "christoffersen_cc",
+      "dgp": "garch-t5",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.02
+    },
+    {
+      "test": "christoffersen_cc",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.008
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0155
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.025,
+      "rate": 0.008
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.0175
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 1000,
+      "alpha": 0.025,
+      "rate": 0.0135
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 2000,
+      "alpha": 0.01,
+      "rate": 0.0215
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0115
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.025,
+      "rate": 0.018
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.0165
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 1000,
+      "alpha": 0.025,
+      "rate": 0.0155
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 2000,
+      "alpha": 0.01,
+      "rate": 0.015
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 2000,
+      "alpha": 0.025,
+      "rate": 0.0225
+    },
+    {
+      "test": "dq",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.091
+    },
+    {
+      "test": "dq",
+      "dgp": "garch-t5",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.0905
+    },
+    {
+      "test": "dq",
+      "dgp": "garch-t5",
+      "n": 2000,
+      "alpha": 0.01,
+      "rate": 0.089
+    },
+    {
+      "test": "dq",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.098
+    },
+    {
+      "test": "dq",
+      "dgp": "iid-t5",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.1105
+    },
+    {
+      "test": "dq",
+      "dgp": "iid-t5",
+      "n": 2000,
+      "alpha": 0.01,
+      "rate": 0.0925
+    },
+    {
+      "test": "esr_v3",
+      "dgp": "garch-t5",
+      "n": 1000,
+      "alpha": 0.025,
+      "rate": 0.0
+    },
+    {
+      "test": "esr_v3",
+      "dgp": "garch-t5",
+      "n": 2000,
+      "alpha": 0.01,
+      "rate": 0.0
+    },
+    {
+      "test": "kupiec",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0855
+    },
+    {
+      "test": "kupiec",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.1005
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.012
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.025,
+      "rate": 0.017
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "garch-t5",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.021
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0125
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.025,
+      "rate": 0.0155
+    }
+  ],
+  "config_hash": "e2a5d2f1aeea242b",
+  "run_manifest": {
+    "config_hash": "e2a5d2f1aeea242b",
+    "versions": {
+      "python": "3.13.1",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1",
+      "pandas": "3.1.0",
+      "arch": "8.0.0",
+      "tailcheck": "0.1.0.dev0"
+    },
+    "started": "2026-10-23T19:25:28+00:00",
+    "platform": "win32"
+  }
+}

@@ -83,9 +83,9 @@ minute).
 
 ```sh
 uv run tailcheck data fetch  --config configs/study.toml
-uv run tailcheck study run   --config configs/study.toml --workers 4      # <= 45 CPU-min
-uv run tailcheck study report --config configs/study.toml                 # results/ + REPORT.md
-uv run tailcheck mc run      --config configs/mc_quick.toml --workers 4   # <= 45 CPU-min
+uv run tailcheck study run   --config configs/study.toml --workers 4      # about 57 CPU-min, 16 min wall
+uv run tailcheck study report --config configs/study.toml                 # results/study-v1/ (REPORT.md is written by hand)
+uv run tailcheck mc run      --config configs/mc_quick.toml --workers 4   # about 88 CPU-min, 23 min wall
 uv run tailcheck mc report   --config configs/mc_quick.toml
 ```
 
@@ -132,5 +132,18 @@ Done:
   `data fetch`, `study run|report`, `mc run|report`), `multiple` (Holm, BH).
   Timings: forecast units 3-60 s each (CAViaR slowest), backtest unit about 25 s.
 
-Next: M7 real run data + study forecast stage, M8 Monte Carlo, M9 study report,
-M10 CLI/README. Follow DESIGN section 9.
+- M8: `montecarlo` (DGPs, runner per (cell, chunk), report with Wilson intervals). Quick
+  run done: 231 cells, 296,280 replications, 22.5 min wall / 87.5 CPU-min, 0 failures;
+  results in `results/mc-quick/`. ESR v3 asymptotic is conservative (0-1% at 5%);
+  Christoffersen ind undersized; DQ oversized at 1%.
+- Study quick run done: 50 cells, 16 min wall / 57 CPU-min, 0 failures; results in
+  `results/study-v1/`. Strict ESR rejections 11 raw / 6 BH / 4 Holm (all too conservative).
+- M9/M10: `REPORT.md`, README (install, quick start, CLI example), CHANGELOG 0.1.0
+  (version bumped, not tagged), DESIGN section 12 (implementation notes).
+- Tests: `uv run pytest` 149 passed / 36 skipped; `--runslow` 183 passed / 2 skipped
+  (iid sparsity vs esreg, documented).
+
+Next (not done): full-size profiles (`configs/study_full.toml`, `configs/mc_full.toml`,
+many CPU-hours), ESR bootstrap size study, checking esback's v3 null distribution,
+tagging v0.1.0 and publishing (needs the owner's go-ahead). Re-running anything: resume
+from `runs/<name>/units/`; delete a run directory only to start over.

@@ -647,3 +647,28 @@ the regime tables.
   for kernel density estimation. *JRSS B* 53(3), 683-690.
 - Software used as oracles: R packages `esreg` 0.6.2 and `esback` 0.3.1 (GPL-3,
   github.com/BayerSe), run in webR 0.6.0 (R 4.6.0). Library wrapped: `arch` 8.0.0 (MCS, GARCH).
+
+## 12. Implementation notes and deviations (v0.1, 2026-10-23)
+
+Recorded when the plan above and the code differ:
+
+- **Forecaster interface.** `fit(window, alphas, rng)` plus `forecast_block(state, r, start,
+  t0, t1, alphas, n_draws, rng)` instead of a per-day `forecast`: one fit serves both alphas
+  and a whole refit block. `hs` rolls its window daily (it has no parameters to refit).
+- **Sheather-Jones bandwidth.** Pair distances are counted once into 20,000 bins; this
+  differs from the exact sum by about 1e-5 relative and is 8 times faster at n = 2000.
+- **`scl_sp` truncated moments.** Closed-form Gaussian-kernel integrals instead of a
+  1,000-point trapezoidal grid (agrees with `vcovA` to 0.4% on the fixtures).
+- **iid sparsity.** Koenker (1994) estimator; about 22% above `esreg`'s on the fixture
+  (unbiased in simulation). Not used by the backtests. See `docs/esreg-covariance.md`.
+- **G2''.** The correct `-2/z^3` is used; `esreg` 0.6.2's `-1/z^3` is available only through
+  the private `_esreg_compat_g2pp` flag (and `_also_esback_g2pp`, which reports both p-values
+  from one fit). Section 4.3.1 checks (a)-(c) were done; see `docs/esreg-covariance.md`.
+- **McNeil-Frey vs `er_backtest`.** One-sided p-values differ by up to 0.06 (expected 0.02)
+  because the bootstrap centring differs; two-sided conventions differ more.
+- **Budgets.** The quick study used about 57 CPU-minutes (target 45). The quick Monte Carlo
+  was calibrated at about 124 CPU-minutes after cutting ESR replications to 200 (size) and 40
+  (power): an ESR test at n = 2000 takes 3-4 s, not the 1 s estimated
+  (`results/mc-quick/calibration.json`).
+- **Study extras.** Each backtest unit also stores the strict-ESR p-value with `esreg`'s G2''
+  so the effect of the discrepancy on real data is visible.
