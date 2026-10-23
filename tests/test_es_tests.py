@@ -167,3 +167,24 @@ def test_mcneil_frey_power_normal_tails() -> None:
     q, e = normal_var_es(alpha)
     r = draw_std_t(rng, 5.0, n)
     assert mcneil_frey(r, np.full(n, q), np.full(n, e), n_boot=999, seed=1).pvalue < 0.05
+
+
+def test_mcneil_frey_against_esback_er_backtest() -> None:
+    """Loose check vs esback::er_backtest (B = 20,000). esback centres the bootstrap
+    t-statistics rather than the data, so one-sided p-values differ by up to about 0.06 on
+    these fixtures (DESIGN expected 0.02); the two-sided conventions differ more and are
+    not compared."""
+    import json
+    from pathlib import Path
+
+    import pandas as pd
+
+    fix = Path(__file__).parent / "fixtures" / "r"
+    ref = json.loads((fix / "outputs" / "r_reference.json").read_text())
+    fc = pd.read_csv(fix / "inputs" / "forecasts.csv")
+    for case in ref["er"]:
+        s = case["set"]
+        res = mcneil_frey(
+            fc.r, fc[f"q_{s}_025"], fc[f"e_{s}_025"], sigma=fc.s, n_boot=20000, seed=1
+        )
+        assert res.pvalue == pytest.approx(case["pvalue_onesided_standardized"], abs=0.07)

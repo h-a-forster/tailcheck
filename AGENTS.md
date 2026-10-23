@@ -99,22 +99,27 @@ long run, validate on a small sample, wrap it in a resume-on-failure loop, and w
 Updated: 2026-10-23.
 
 Done:
-- Scaffold: packaging, pinned lock (`uv.lock`), CI (pull_request + workflow_dispatch only),
-  hygiene files, typed API stubs, smoke tests. `docs/DESIGN.md` with formulas and milestones.
-- Research checks (2026-10-23): Stooq CSV downloads are blocked by a JavaScript bot check, so
-  FRED is used instead. Binance daily klines switch from millisecond to microsecond
-  timestamps in 2025. webR runs `esreg` 0.6.2 / `esback` 0.3.1 under Node on this machine.
-- M3: `es_tests` (AS Z1/Z2 simulation test, `location_scale_simulator`, McNeil-Frey
-  bootstrap-t) and `dist` (normal and standardized-t VaR/ES). Z2 null 5% quantile matches
-  -0.70; MF one-sided test is conservative with t5 residuals (about 3% at 5%).
-- M2: `var_tests` (Kupiec, Christoffersen ind/cc, DQ via lstsq with rank df, Basel traffic
-  light) with all DESIGN 4.1 reference values. Christoffersen ind is conservative at
-  n=500, alpha=0.025 (1.25% rejections at 5%), as expected with rare hits.
-- M1: `checkpoint.UnitStore` (atomic JSON/NPZ units, manifest with config hash and versions,
-  `progress.log`) and `run_units` (skip done units, <= 4 processes, BLAS threads = 1).
+- Scaffold, `docs/DESIGN.md`, research checks (FRED instead of Stooq; Binance ms->us
+  timestamps in 2025; webR runs esreg/esback).
+- M1: `checkpoint.UnitStore` (atomic JSON/NPZ units, manifest, `progress.log`) and
+  `run_units` (skip done units, <= 4 processes, BLAS threads = 1).
+- M2: `var_tests` with all DESIGN 4.1 reference values. Christoffersen ind is conservative
+  with rare hits (1.25% at 5%, n=500, alpha=0.025).
+- M3: `es_tests` (AS Z1/Z2, McNeil-Frey bootstrap-t) and `dist`. MF one-sided is
+  conservative with t5 residuals; vs `esback::er_backtest` one-sided p within 0.07.
+- M4a/b: `esreg` (loss, G functions, LP quantile regression, ILS estimator, sandwich
+  covariance with iid/nid, ind/scl_N/scl_sp, SJ bandwidth). R fixtures generated
+  (`scripts/r_fixtures/make_inputs.py`, `fixtures.R`, outputs in `tests/fixtures/r/`).
+  QR matches R to 1e-14; our esreg loss <= R loss; vcov matches vcovA to 4e-6 (scl_N) /
+  0.4% (scl_sp). Derivation and checks: `docs/esreg-covariance.md`.
+- **Confirmed esreg 0.6.2 discrepancy**: `G2_prime_prime(z, 1)` returns `-1/z^3` (correct:
+  `-2/z^3`); repro in `scripts/r_fixtures/g2pp_repro.R`. Affects misspec=TRUE covariance;
+  private flag `_esreg_compat_g2pp` reproduces R. Default is the correct formula.
+- iid sparsity differs from esreg's by ~22% (ours verified unbiased in simulation); not
+  used by the backtests.
+- M4c: `esr_backtest` v1-v3, asymptotic + bootstrap. In compat mode all 36 esback p-values
+  agree within 0.006 (3 fast cases in CI, the rest `slow`).
+- M5: `scoring` (FZ0, DM with NW/HLN, `mean_with_ci`, MCS wrapper on arch).
 
-Open items:
-- Verify in M4b: `esreg` 0.6.2's `G2_prime_prime` for G2 type 1 returns `-1/z^3` where
-  calculus gives `-2/z^3` (misspecification term of Lambda_22 only). See DESIGN 4.3.1.
-
-Next: M4a (`esreg` loss, G functions, quantile regression, estimator). Follow the milestone table in DESIGN section 9.
+Next: M6 forecasters, M7 data + study forecast stage, M8 Monte Carlo, M9 study report,
+M10 CLI/README. Follow DESIGN section 9.
