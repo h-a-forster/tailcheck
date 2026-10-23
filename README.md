@@ -1,42 +1,154 @@
 # tailcheck
 
-VaR and Expected Shortfall backtests for Python, with p-values checked by Monte Carlo.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
 
-> **Status: pre-alpha scaffold.** The API in `src/tailcheck/` is stubbed and the design is in
-> [docs/DESIGN.md](docs/DESIGN.md). Nothing here is ready to use yet. Progress is tracked in
-> [AGENTS.md](AGENTS.md#status-and-next-steps).
+Value-at-Risk and Expected Shortfall backtests for Python, with p-values checked by Monte
+Carlo and the ES regression tests checked against the reference R implementation.
 
-Basel FRTB made Expected Shortfall the standard market-risk measure. The standard ES
-backtests are available in R (`esreg`, `esback`) and in the commercial MATLAB Risk Management
-Toolbox. tailcheck aims to provide them as a tested Python package:
+Basel FRTB made Expected Shortfall the standard market-risk measure. The established ES
+backtests live in R (`esreg`, `esback`) and in commercial toolboxes. tailcheck provides them as
+a typed, tested Python package:
 
 | Family | Tests |
 |---|---|
 | VaR | Kupiec POF, Christoffersen independence and conditional coverage, Engle-Manganelli dynamic quantile, Basel traffic light |
-| ES | Acerbi-Szekely Z1 and Z2 (simulated null), McNeil-Frey exceedance residuals (bootstrap) |
-| ES regression | Bayer-Dimitriadis strict, auxiliary and strict-intercept ESR backtests, built on a Python implementation of joint quantile/ES regression (Dimitriadis-Bayer M-estimator with sandwich covariance) |
-| Comparison | FZ0 loss, Diebold-Mariano, model confidence set (via `arch`) |
+| ES | Acerbi-Szekely Z1 and Z2 (simulated null), McNeil-Frey exceedance residuals (bootstrap-t) |
+| ES regression | Bayer-Dimitriadis strict, auxiliary and strict-intercept ESR backtests, on a Python implementation of joint quantile/ES regression (Dimitriadis-Bayer M-estimator with sandwich covariance) |
+| Comparison | FZ0 loss, Diebold-Mariano (Newey-West, HLN correction), model confidence set (via `arch`) |
 
-Every test will ship with a Monte Carlo size and power table, so you can see whether its
-p-values hold at your sample size. The package also includes a reproducible study:
-historical simulation, GJR-GARCH-t, filtered HS, EVT-POT and CAViaR forecasting one-day 1% and
-2.5% VaR/ES for BTC, ETH and three equity indices, out of sample over 2021-2026.
+To our knowledge, no other Python package implements the ESR backtests or the
+Acerbi-Szekely tests (searched 2026-10-23).
 
-## Conventions
+## What has been checked
 
-Returns `r`, VaR `q` and ES `e` are all on the return scale, so left-tail forecasts are
-negative and `e <= q`. A VaR exceedance is `r <= q`.
+- **Reference values.** Kupiec non-rejection regions, Christoffersen worked examples, the
+  Basel cumulative probabilities (8.11% ... 99.99%), standardized-t and normal VaR/ES, and
+  Hall-Sheather bandwidths are tested to 1e-9 against independent computations
+  (`scripts/reference_values.py`).
+- **Against R.** On committed fixtures from `esreg` 0.6.2 / `esback` 0.3.1 (run through
+  webR): quantile regression agrees to 1e-14; our joint-regression loss is never above R's;
+  the sandwich covariance agrees to 4e-6 (`scl_N`) and 0.4% (`scl_sp`) at R's coefficients;
+  all 36 `esr_backtest` p-values agree within 0.006 once one discrepancy in `esreg` is
+  reproduced (next point).
+- **A discrepancy in `esreg` 0.6.2.** Its second derivative of the default G2 function
+  returns `-1/z^3` instead of `-2/z^3`. The term enters the misspecification-robust
+  covariance used by `esback`'s default ESR tests and moved strict-ESR p-values by up to
+  0.25 on the fixtures. tailcheck uses the correct formula. Minimal repro and analysis:
+  [docs/esreg-covariance.md](docs/esreg-covariance.md).
+- **Size and power.** A Monte Carlo study reports the rejection rate of every test at the
+  sample sizes used in practice, with Wilson intervals. See [REPORT.md](REPORT.md).
 
-## Development
+## Install
+
+Not on PyPI. Install from GitHub with uv (or pip):
+
+```sh
+uv add git+https://github.com/h-a-forster/tailcheck
+# or, for the command-line tool only
+uv tool install git+https://github.com/h-a-forster/tailcheck
+```
+
+Python 3.11+. Runtime dependencies: numpy, scipy, pandas, arch.
+
+## Quick start
+
+Conventions: returns `r`, VaR `q` and ES `e` are on the return scale, so left-tail forecasts
+are negative and `e <= q`. A VaR exceedance is `r <= q`. Every test returns a
+`BacktestResult` with `statistic`, `pvalue`, `alternative` and `details`; an undefined test
+(for example no exceedances) has `pvalue = nan` and a `details["reason"]`.
+
+```python
+import pandas as pd
+from tailcheck.var_tests import kupiec_pof, christoffersen_cc, dynamic_quantile
+from tailcheck.es_tests import mcneil_frey
+from tailcheck.esr_backtest import esr_backtest
+from tailcheck.scoring import fz0_loss, diebold_mariano
+
+df = pd.read_csv("examples/garch_t5.csv")  # columns r, q, e, sigma; alpha = 2.5%
+r, q, e, s = df.r, df.q, df.e, df.sigma
+
+kupiec_pof(r, q, 0.025).pvalue
+christoffersen_cc(r, q, 0.025).pvalue
+dynamic_quantile(r, q, 0.025, lags=4).pvalue
+mcneil_frey(r, q, e, sigma=s, n_boot=2000, seed=1).pvalue
+esr_backtest(r, e, 0.025, version=1, seed=1).pvalue  # strict ESR, Wald chi2(2)
+esr_backtest(r, e, 0.025, version=3, seed=1).pvalue  # one-sided intercept test
+fz0_loss(r, q, e, 0.025).mean()
+```
+
+From the command line:
+
+```console
+$ tailcheck backtest examples/garch_t5.csv --alpha 0.025
+n = 1000, alpha = 0.025, hits = 24 (expected 25.0)
+test                     statistic     p-value  alternative
+kupiec_pof                  0.0416      0.8384  two-sided
+christoffersen_ind          1.1817      0.2770  two-sided
+christoffersen_cc           1.2232      0.5425  two-sided
+dynamic_quantile            2.8109      0.8322  two-sided
+mcneil_frey                 2.2968      0.9200  less
+esr_v1                      3.0751      0.2149  two-sided
+esr_v2                      3.0748      0.2149  two-sided
+esr_v3                      1.5024      0.9335  less
+traffic light: green (binomial CDF 0.4724)
+mean FZ0 loss: 0.8074 [0.6889, 0.9260] (95% NW)
+```
+
+The Acerbi-Szekely test needs the forecast distribution, passed as a simulator:
+
+```python
+import numpy as np
+from tailcheck.dist import draw_std_t
+from tailcheck.es_tests import acerbi_szekely_test, location_scale_simulator
+
+sim = location_scale_simulator(np.zeros(len(r)), s, lambda rng, shape: draw_std_t(rng, 5.0, shape))
+acerbi_szekely_test(r, q, e, 0.025, sim, statistic="z2", n_sim=5000, seed=1)
+```
+
+## Study and Monte Carlo
+
+The repository includes a reproducible study (five forecasters, BTC, ETH, S&P 500, Nasdaq
+Composite and Nikkei 225, 1% and 2.5% VaR/ES, out of sample 2021-01 to 2026-09) and the
+Monte Carlo size/power validation. Results and limitations: [REPORT.md](REPORT.md).
+
+```sh
+uv run tailcheck data fetch   --config configs/study.toml   # Binance + FRED, cached in data/
+uv run tailcheck study run    --config configs/study.toml --workers 4
+uv run tailcheck study report --config configs/study.toml   # writes results/study-v1/
+uv run tailcheck mc run       --config configs/mc_quick.toml --workers 4
+uv run tailcheck mc report    --config configs/mc_quick.toml
+```
+
+Every long run is checkpointed per unit under `runs/<name>/units/` and resumes where it
+stopped; progress goes to `runs/<name>/progress.log`. Full-size configurations
+(`configs/study_full.toml`, `configs/mc_full.toml`) take many CPU-hours.
+
+## How to validate
 
 ```sh
 uv sync --group dev
-uv run pytest
-uv run ruff check .
-uv run ruff format --check .
+uv run pytest                 # fast suite (as in CI)
+uv run pytest --runslow       # plus the slow checks (all 36 ESR fixtures, small MC)
+uv run ruff check . && uv run ruff format --check .
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DESIGN.md](docs/DESIGN.md).
+To regenerate the R fixtures (needs Node 20+, downloads R packages into webR's in-memory
+library; nothing is installed on the host), see `scripts/r_fixtures/` and
+[AGENTS.md](AGENTS.md#how-to-test).
+
+## Documentation
+
+- [docs/DESIGN.md](docs/DESIGN.md): formulas, reference values, edge cases, study and
+  Monte Carlo design.
+- [docs/esreg-covariance.md](docs/esreg-covariance.md): covariance derivation and the R
+  comparison.
+- [REPORT.md](REPORT.md): study and Monte Carlo results.
+
+## Citation
+
+See [CITATION.cff](CITATION.cff). Please also cite the papers behind the tests you use, in
+particular Dimitriadis and Bayer (2019) and Bayer and Dimitriadis (2022) for the ESR tests.
 
 ## Licence
 

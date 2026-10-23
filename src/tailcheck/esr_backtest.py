@@ -69,6 +69,7 @@ def esr_backtest(
     seed: int | None = None,
     early_stopping: int = 10,
     _esreg_compat_g2pp: bool = False,
+    _also_esback_g2pp: bool = False,
 ) -> BacktestResult:
     """Run one ESR backtest; asymptotic p-value, plus bootstrap p-value if ``n_boot > 0``.
 
@@ -144,6 +145,20 @@ def esr_backtest(
         details["pvalue_less"] = p_less
         details["pvalue_two_sided"] = p_two
         p = p_less
+
+    if _also_esback_g2pp and not _esreg_compat_g2pp:
+        # Same fit, covariance with esreg 0.6.2's G2'' (docs/esreg-covariance.md).
+        try:
+            cov_c, _ = vcov_details(fit, sparsity, sigma_est, misspec, _esreg_compat_g2pp=True)
+            ce = cov_c[kq:, kq:]
+            if np.linalg.eigvalsh(ce).min() <= 0:
+                raise ValueError("not positive definite")
+            st = _stat(version, fit.coef_e, ce)
+            details["pvalue_esback_g2pp"] = (
+                float(stats.chi2.sf(st, 2)) if version in (1, 2) else float(stats.norm.cdf(st))
+            )
+        except (ValueError, RuntimeError, np.linalg.LinAlgError):
+            details["pvalue_esback_g2pp"] = math.nan
 
     if n_boot > 0:
         details.update(

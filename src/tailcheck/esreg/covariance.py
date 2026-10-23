@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
-from scipy import optimize, stats
+from scipy import optimize, special, stats
 
 from tailcheck.esreg.estimator import ESRegFit
 from tailcheck.esreg.gfuns import G2, g1_prime, g1_prime_prime, g2, g2_prime, g2_prime_prime
@@ -52,12 +52,15 @@ def _phi6(u: Arr) -> Arr:
     return (u2**3 - 15 * u2**2 + 45 * u2 - 15) * np.exp(-u2 / 2) / math.sqrt(2 * math.pi)
 
 
-def bandwidth_sj(x: ArrayLike) -> float:
+def bandwidth_sj(x: ArrayLike, nbins: int = 20_000) -> float:
     """Sheather-Jones (1991) solve-the-equation bandwidth for a Gaussian KDE.
 
-    Exact (unbinned) pairwise sums; the functional estimates include the diagonal terms and
-    divide by ``n (n - 1)`` (Wand and Jones 1995, sec. 3.6). O(n^2) memory in the pair
-    differences, so intended for at most a few thousand points.
+    Pairwise sums over all ``n (n - 1) / 2`` absolute differences, counted once into
+    ``nbins`` fine bins (width ``max|d| / nbins``) so that each functional evaluation is
+    O(nbins); with 20,000 bins the result differs from the unbinned sum by about 1e-5
+    relative (R's ``bw.SJ`` bins the data range into 1,000 bins). The functional estimates
+    include the diagonal terms and divide by ``n (n - 1)`` (Wand and Jones 1995, sec. 3.6).
+    O(n^2) memory for the differences, so intended for at most a few thousand points.
     """
     xa = np.asarray(x, dtype=np.float64)
     xa = xa[np.isfinite(xa)]
@@ -70,13 +73,19 @@ def bandwidth_sj(x: ArrayLike) -> float:
     if scale <= 0:
         raise ValueError("data have zero spread")
     i, j = np.triu_indices(n, k=1)
-    d = xa[i] - xa[j]
+    dist = np.abs(xa[i] - xa[j])
+    edges = np.linspace(0.0, float(dist.max()) * (1 + 1e-12) + 1e-300, nbins + 1)
+    counts, _ = np.histogram(dist, edges)
+    mid = 0.5 * (edges[1:] + edges[:-1])
+    del dist, i, j
+    keep = counts > 0
+    cnt, d = counts[keep].astype(np.float64), mid[keep]
 
     def sdh(h: float) -> float:  # estimate of R(f'') = int f''^2
-        return (2 * _phi4(d / h).sum() + n * _phi4(np.zeros(1))[0]) / (n * (n - 1) * h**5)
+        return (2 * (cnt * _phi4(d / h)).sum() + n * _phi4(np.zeros(1))[0]) / (n * (n - 1) * h**5)
 
     def tdh(h: float) -> float:  # estimate of -int f'' f''''
-        return (2 * _phi6(d / h).sum() + n * _phi6(np.zeros(1))[0]) / (n * (n - 1) * h**7)
+        return (2 * (cnt * _phi6(d / h)).sum() + n * _phi6(np.zeros(1))[0]) / (n * (n - 1) * h**7)
 
     a = 1.24 * scale * n ** (-1 / 7)
     b = 1.23 * scale * n ** (-1 / 9)
@@ -177,13 +186,16 @@ def _truncated_variance(
         info["sj_bandwidth"] = bw
         # Exact truncated moments of the Gaussian KDE up to beta_i (closed form of the
         # integrals that a fine trapezoidal grid approximates).
-        a = (beta[:, None] - z[None, :]) / bw
-        cdf, pdf = stats.norm.cdf(a), stats.norm.pdf(a)
-        m0 = cdf.mean(axis=1)
-        m1 = (z[None, :] * cdf - bw * pdf).mean(axis=1)
-        m2 = (z[None, :] ** 2 * cdf - 2 * z[None, :] * bw * pdf + bw**2 * (cdf - a * pdf)).mean(
-            axis=1
-        )
+        m0, m1, m2 = (np.empty(len(beta)) for _ in range(3))
+        zz = z[None, :]
+        for lo in range(0, len(beta), 256):  # row blocks bound memory to 256 x n
+            sl = slice(lo, lo + 256)
+            a = (beta[sl, None] - zz) / bw
+            cdf = special.ndtr(a)
+            pdf = np.exp(-0.5 * a * a) * (1 / math.sqrt(2 * math.pi))
+            m0[sl] = cdf.mean(axis=1)
+            m1[sl] = (zz * cdf - bw * pdf).mean(axis=1)
+            m2[sl] = (zz**2 * cdf - 2 * zz * bw * pdf + bw**2 * (cdf - a * pdf)).mean(axis=1)
         with np.errstate(divide="ignore", invalid="ignore"):
             v = sigma**2 * (m2 / m0 - (m1 / m0) ** 2)
     else:

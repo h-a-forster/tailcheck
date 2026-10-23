@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-23",
+  "method": "tmp config identical to configs/mc_quick.toml except reps (cheap 20 per cell, ESR 4 per cell), 4 workers",
+  "cheap_seconds_per_replication_cell": 0.0217,
+  "esr_seconds_per_replication_size_cells": 8.3,
+  "esr_seconds_per_replication_power_cells": 6.5,
+  "note_size": "size cells also compute the esback-G2'' variant of the v1 covariance from the same fit",
+  "projection_original_reps_cpu_minutes": {"cheap": 15.2, "esr": 168},
+  "decision": "ESR reps_size 250 -> 200 (DESIGN floor), reps_power 100 -> 40; cheap reps unchanged. Projected 15 + 109 = 124 CPU-minutes (about 31 minutes wall on 4 workers), over the 45 CPU-minute target because an ESR test at n = 2000 takes about 3-4 s rather than the 1 s estimated at scaffold time."
+}

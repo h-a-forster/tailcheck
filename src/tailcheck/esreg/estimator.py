@@ -87,12 +87,17 @@ class _Objective:
         self.y, self.xq, self.xe, self.alpha, self.g1, self.g2 = y, xq, xe, alpha, g1, g2
         self.kq = xq.shape[1]
         self.neg = g2 in NEGATIVE_DOMAIN
+        self.fz0 = g1 == G1.ZERO and g2 == G2.NEG_INV
 
     def __call__(self, b: NDArray[np.float64]) -> float:
         q = self.xq @ b[: self.kq]
         e = self.xe @ b[self.kq :]
         if self.neg and np.any(e >= -0.01):
             return np.inf
+        if self.fz0:  # G1 = 0, G2 = -1/z is the FZ0 loss; written out for speed
+            u = np.maximum(q - self.y, 0.0)
+            val = float(np.mean((q - u / self.alpha) / e + np.log(-e))) - 1.0
+            return val if np.isfinite(val) else np.inf
         val = float(np.mean(esr_loss_raw(self.y, q, e, self.alpha, self.g1, self.g2)))
         return val if np.isfinite(val) else np.inf
 

@@ -1,0 +1,27 @@
+{
+  "config": "configs\\study.toml",
+  "config_hash": "8a7e477162200e84",
+  "seed": 20261023,
+  "n_backtest_cells": 50,
+  "esr_v1_rejections_5pct": {
+    "raw": 11,
+    "holm": 4,
+    "bh": 6
+  },
+  "esr_v1_undefined": 0,
+  "forecast_cpu_seconds": 761.3560944000055,
+  "python": "3.13.1",
+  "run_manifest": {
+    "config_hash": "8a7e477162200e84",
+    "versions": {
+      "python": "3.13.1",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1",
+      "pandas": "3.1.0",
+      "arch": "8.0.0",
+      "tailcheck": "0.1.0.dev0"
+    },
+    "started": "2026-10-23T18:57:28+00:00",
+    "platform": "win32"
+  }
+}
