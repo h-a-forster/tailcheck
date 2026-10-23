@@ -25,7 +25,8 @@ from pathlib import Path
 
 import numpy as np
 
-SEED, N, ALPHA, WORKERS = 20261024, 1000, 0.025, 3
+SEED, N, ALPHA = 20261024, 1000, 0.025
+WORKERS = int(os.environ.get("ESBACK_NULL_WORKERS", "3"))
 REPS = int(os.environ.get("ESBACK_NULL_REPS", "250"))
 IO = Path("tmp/esback_null")
 OURS = IO / "ours"

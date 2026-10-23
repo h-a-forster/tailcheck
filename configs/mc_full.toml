@@ -3,7 +3,7 @@
 # three versions take about 2.0, 2.3, 3.8 and 12.6 s per replication at n = 500, 1000, 2000
 # and 5000 (about 33 CPU-hours), plus about 5-8 CPU-hours for the other tests and the
 # per-chunk Acerbi-Szekely null samples. Resumable: completed chunks are skipped on rerun.
-# A bootstrap ESR size study is not part of this runner (DESIGN 6.4).
+# The bootstrap ESR size study has its own runner (configs/mc_esr_boot.toml, DESIGN 6.1).
 name = "mc-full"
 seed = 20261023
 level = 0.05

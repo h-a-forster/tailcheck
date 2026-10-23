@@ -509,6 +509,33 @@ size at n = 500, alpha = 0.025, R = 400, iid normal; rejection rate in [0.02, 0.
 null mean is about 0. McNeil-Frey size at R = 200. One ESR v1 size check at R = 60, n = 1000,
 marked `slow`.
 
+### 6.1 Bootstrap ESR size study and the esback null check (added after 0.1.0)
+
+**Question.** The asymptotic one-sided ESR v3 test is conservative in the quick Monte Carlo
+(section 3 of REPORT.md). Does the bootstrap of section 4.3.4 restore its size, at what cost
+in power, and does the strict ESR (v1) bootstrap stay near nominal?
+
+**Method.** `tailcheck.montecarlo.esr_boot`, config `configs/mc_esr_boot.toml`, commands
+`tailcheck mc boot-run` / `boot-report`. A full bootstrap test per replication costs
+B + 1 fits (about 40 s at n = 1000, B = 99), so most cells use the warp-speed method
+(Giacomini, Politis and White 2013, *Econometric Theory* 29(3)): each replication computes
+the statistic T0 and one bootstrap statistic T* from a single resample, with exactly the
+centring and covariance of `esr_backtest`; the bootstrap critical value is the empirical
+level (v3, lower tail) or 1 - level (v1, upper tail) quantile of the pooled T*, and the
+rejection rate is the share of T0 beyond it. Its 95% interval resamples the pairs
+(T0, T*) jointly (2,000 resamples), which carries both the binomial error and the error of
+the pooled critical value. One `exact` cell (v3, n = 1000, B = 99) runs the full bootstrap
+test per replication as a cross-check (Wilson interval). Every replication also stores the
+asymptotic p-value, so asymptotic and bootstrap rates are paired on the same data. A long
+run uses `--max-minutes` so each session stops starting units after a time budget and the
+next session resumes.
+
+**esback check.** `scripts/esback_null/` runs `esback::esr_backtest` (asymptotic, package
+defaults) through webR on 250 `garch-t5` null samples (n = 1000, alpha = 2.5%) and tailcheck
+on the same samples with and without esreg's G2'' (`results/esback-null/`). This replaces
+the earlier inference ("tailcheck matches esback on fixtures, so esback is probably
+conservative too") with a direct measurement.
+
 ## 7. Validation and test strategy
 
 Layers, each in `tests/`:
@@ -705,7 +732,7 @@ Recorded when the plan above and the code differ:
 - **Study extras.** Each backtest unit also stores the strict-ESR p-value with `esreg`'s G2''
   so the effect of the discrepancy on real data is visible.
 - **Config keys.** `[backtest] as_statistic` and `[esr] bootstrap` were removed (only Z2 is
-  computed in the study, and the Monte Carlo runner has no bootstrap ESR path); `[run]
+  computed in the study; the bootstrap ESR Monte Carlo is a separate runner, section 6.1); `[run]
   workers` is now the default for `--workers`.
 - **DGP name.** The `slow-vol` power DGP is called `unconditional`: it is constant-sigma t5
   forecasts on the `garch-t5` data, not a separate slowly varying volatility process.
