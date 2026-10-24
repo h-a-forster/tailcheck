@@ -8,6 +8,14 @@ Steps (run from the repository root):
     uv run python scripts/esback_null/esback_null.py ours       # tailcheck, same data
     uv run python scripts/esback_null/esback_null.py summary    # results/esback-null/
 
+Optional trace of the largest strict-ESR differences (writes tmp/esback_null/trace.txt, then
+compares the esreg optimum with tailcheck's at the same loss; results/esback-null/trace_v1.json):
+
+    uv run python scripts/esback_null/esback_null.py trace-list
+    node scripts/r_fixtures/run_r.mjs scripts/esback_null/trace_v1.R tmp/esback_null \
+        esreg jsonlite
+    uv run python scripts/esback_null/esback_null.py trace
+
 The data are the Monte Carlo ``garch-t5`` size DGP (true forecasts) with n = 1000 and
 alpha = 2.5%; replication i uses ``np.random.default_rng([SEED, i])``. tailcheck p-values are
 computed with the correct G2'' and with esreg 0.6.2's (``_esreg_compat_g2pp``, which is what
@@ -151,9 +159,65 @@ def summary() -> None:
     print(text)
 
 
+def trace_list(k: int = 4) -> None:
+    """Replications with the largest |esback v1 - tailcheck v1 (esreg G2'')|, plus rep_000."""
+    import csv
+
+    with (OUT / "pvalues.csv").open(encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    rows.sort(key=lambda r: -abs(float(r["esback_v1"]) - float(r["tailcheck_v1_compat"])))
+    reps = [r["rep"] for r in rows[:k]]
+    if "rep_000" not in reps:
+        reps.append("rep_000")
+    (IO / "trace.txt").write_text("\n".join(reps) + "\n", encoding="utf-8", newline="\n")
+    print(reps)
+
+
+def trace() -> None:
+    """Mean loss at esreg's and at tailcheck's strict-ESR optimum (same objective, same data)."""
+    from tailcheck.esr_backtest import _fit
+    from tailcheck.esreg.gfuns import G1, G2
+    from tailcheck.esreg.loss import esr_loss_raw
+    from tailcheck.montecarlo.dgp import simulate
+
+    r_fits = json.loads((IO / "trace_out.json").read_text("utf-8"))
+    out = {}
+    for rep, v in r_fits.items():
+        i = int(rep.split("_")[1])
+        s = simulate("garch-t5", N, ALPHA, np.random.default_rng([SEED, i]))
+        fit = _fit(s.r, s.e, s.e, ALPHA, 10, 1)
+        x = np.column_stack([np.ones(N), s.e])
+
+        def loss(b: np.ndarray, x: np.ndarray = x, s: object = s, fit: object = fit) -> float:
+            sh = fit.y_shift  # type: ignore[attr-defined]
+            y = s.r - sh  # type: ignore[attr-defined]
+            q, e = x @ b[:2] - sh, x @ b[2:] - sh
+            return float(np.mean(esr_loss_raw(y, q, e, ALPHA, G1.ZERO, G2.NEG_INV)))
+
+        b_r = np.asarray(v["coef"], dtype=float)
+        out[rep] = {
+            "coef_esreg": b_r.tolist(),
+            "coef_tailcheck": fit.coef.tolist(),
+            "loss_reported_by_esreg": float(v["loss"]),
+            "loss_at_esreg_coef": loss(b_r),
+            "loss_at_tailcheck_coef": loss(fit.coef),
+            "loss_difference_esreg_minus_tailcheck": loss(b_r) - loss(fit.coef),
+            "max_abs_coef_difference": float(np.max(np.abs(b_r - fit.coef))),
+        }
+    text = json.dumps(out, indent=2) + "\n"
+    (OUT / "trace_v1.json").write_text(text, encoding="utf-8", newline="\n")
+    print(text)
+
+
 if __name__ == "__main__":
-    steps = {"inputs": write_inputs, "ours": run_ours, "summary": summary}
+    steps = {
+        "inputs": write_inputs,
+        "ours": run_ours,
+        "summary": summary,
+        "trace-list": trace_list,
+        "trace": trace,
+    }
     step = sys.argv[1] if len(sys.argv) > 1 else ""
     if step not in steps:
-        sys.exit("usage: esback_null.py inputs|ours|summary")
+        sys.exit("usage: esback_null.py inputs|ours|summary|trace-list|trace")
     steps[step]()

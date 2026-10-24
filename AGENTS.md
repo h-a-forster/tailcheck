@@ -168,7 +168,8 @@ Done:
     n = 1000, bootstrap 6.2%.
   - esback directly on 250 null samples (`scripts/esback_null/`, `results/esback-null/`):
     v3 one-sided 0/250, same as tailcheck; same 5% decisions in all 250; max v1 p-value
-    difference 0.057 (3 reps > 0.01; not traced, likely different local optima).
+    difference 0.057 (3 reps > 0.01). Traced (`trace_v1.json`): same objective to 1e-14,
+    our optimum lower in all 5 traced reps by 2e-8..4.5e-6; flat loss in the ES coefficients.
   - Monte Carlo report: chunk-clustered intervals + design effect; Acerbi-Szekely design
     effect about 1.05, same as tests with nothing shared (REPORT 3).
   - `run_units(max_seconds=...)`: time-budgeted sessions; queued units are cancelled.
@@ -183,8 +184,5 @@ Next (not done):
 - Bootstrap ESR at alpha = 1% and on `iid-t5`; bootstrap p-values in the study (the quick
   study's v3 column is conservative, REPORT 3.1). Full-size boot profile: warp reps x 5, exact
   cell 300 reps with n_boot = 199 (about 25 CPU-hours, see the config header).
-- Trace the 3 replications where tailcheck (esreg G2'') and esback v1 p-values differ by
-  more than 0.01 (`results/esback-null/pvalues.csv`, reps 086, 076, 035): compare the
-  M-estimator losses at both optima.
 - Tagging v0.1.0 and publishing (needs the owner's go-ahead). Re-running anything: resume
 from `runs/<name>/units/`; delete a run directory only to start over.

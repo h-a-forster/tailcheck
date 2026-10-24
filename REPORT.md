@@ -288,8 +288,13 @@ So `esback`'s asymptotic one-sided v3 test is conservative in the same way (no r
 samples tailcheck (with esreg's G2'') and esback agree to a median absolute difference of
 0.0005 (v3) and 0.0013 (v1) in p-value, and reach the same decision at 5% in every
 replication; the largest v1 difference is 0.057 (3 replications differ by more than 0.01),
-larger than the 0.006 seen on the fixtures. The cause was not traced per replication; a
-different local optimum of the M-estimator (both use random starts) is the likely reason.
+larger than the 0.006 seen on the fixtures. Traced for the four largest differences plus
+one typical replication (`results/esback-null/trace_v1.json`): esreg's reported loss equals
+our loss at esreg's coefficients to 1e-14, and our optimum has the lower loss in all five
+(by 2e-8 to 4.5e-6, at a mean loss of about 2). The joint loss is nearly flat in the ES
+coefficients, so stopping points that differ by such tiny losses move the ES coefficients
+by up to 0.056 and the p-value by up to 0.057. Neither implementation is wrong; strict-ESR
+p-values carry this optimisation noise of a few hundredths in rare cases.
 
 ## 4. Study results
 
