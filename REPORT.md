@@ -21,7 +21,11 @@ those files; the commands that rebuild them are at the end.
   n = 1000, alpha = 1% (1.2-2.9%). The strict ESR test rejects 5.5-8% of 200 null
   replications per cell (every Wilson interval reaches 5%); the one-sided ESR v3 test is
   conservative (0-1%), mainly through a small positive finite-sample bias of the ES
-  intercept and an inflated standard error (section 3).
+  intercept and an inflated standard error (section 3). `esback`'s asymptotic v3 rejects 0
+  of 250 null samples too. The bootstrap restores the size of v3 (4.3% in 1,000 null
+  replications, interval 2.2-6.1%) and nearly doubles its power (0.65 against 0.35-0.37);
+  the strict ESR test is mildly oversized at n = 1000 asymptotically (7.3%) and 6.2% with
+  the bootstrap (section 3.1).
 - In the study (5 assets x 5 forecasters x 2 levels, out of sample 2021-01 to 2026-09), 11 of
   50 strict ESR tests reject at 5% before adjustment, 6 after Benjamini-Hochberg and 4 after
   Holm. All 6 BH rejections come with exceedance rates below the nominal level and one-sided
@@ -142,8 +146,13 @@ drawn afresh for each chunk of 50 replications, so its Monte Carlo error is shar
 chunk only and averages out over the 40 chunks of a size cell. In the first run one null
 sample served a whole cell, which could shift that cell's true size by about +-0.5
 percentage points (1 sd), an error the Wilson interval did not include. The Wilson
-intervals still treat replications as independent, so they remain very slightly too
-narrow for the Acerbi-Szekely rows.
+intervals treat replications as independent. `size_power.csv` now also has a
+chunk-clustered interval (`lo_chunk`, `hi_chunk`; chunks as sampling units) and the design
+effect (clustered over binomial variance). Over the 30 cells per test the mean design effect
+is 1.05 for Z1 and 1.06 for Z2, against 0.99-1.09 for the VaR tests and McNeil-Frey, whose
+replications share nothing; the per-cell estimates are noisy (0.5-2.2 with 20-40 chunks).
+So the shared null sample does not measurably widen the Acerbi-Szekely intervals, and the
+clustered intervals change no conclusion.
 
 **Size** (rejection rate of a true model; selected cells, `garch-t5`):
 
@@ -190,11 +199,9 @@ The `iid-t5` cells look the same (Kupiec 10.1% at n = 250, 1%, 7.3% at n = 250, 
   sd 1.23); the default rejects 1.5% in this study (0 of 200 in the Monte Carlo cell, within
   sampling error); `scl_N` without the misspecification terms understates the SE (0.159)
   and rejects 7%. So the misspecification terms explain part, not all, of the
-  conservativeness. tailcheck reproduces `esback`'s v3 p-values on the R fixtures (within
-  0.006 once esreg's G2'' is reproduced), so `esback`'s asymptotic v3 with its default
-  covariance very likely behaves the same way. For a v3 test with closer to nominal size,
-  the bootstrap (implemented, not run here) is the candidate; its size has not been
-  checked.
+  conservativeness. `esback`'s own asymptotic v3 is just as conservative when run directly
+  on simulated null data (0 of 250), and the bootstrap restores its size; both are in
+  section 3.1.
 
 **Power** (rejection rate of a wrong model; selected cells):
 
@@ -215,6 +222,74 @@ detect a wrong tail shape at a correct VaR (where VaR tests have no power by con
 and DQ is best against unconditional forecasts. At these sample sizes the ESR tests are
 less powerful than Z2 against understated scale and than Z1/McNeil-Frey against wrong tail
 shape, but they need no predictive distribution and no volatility input.
+
+### 3.1 Bootstrap ESR tests and esback on null data (follow-up)
+
+Run 2026-10-23/24 at tailcheck 0.1.0 with the code of commit `d23ea84` (the run started
+from the working tree just before that commit; the one later source change, to the
+Monte Carlo report aggregation, does not touch the units, which the run log records as a
+source-hash warning on resume); config
+`configs/mc_esr_boot.toml`, hash `c35185f6c450a45f`, seed 20261024; method in DESIGN
+section 6.1). Full table: `results/mc-esr-boot/size_power.md`. 2,320 replications, 305
+CPU-minutes over four resumed sessions of at most 40 minutes each on 2-3 worker processes
+(the config header projected about 180; the machine was shared with other jobs). No
+replication failed and no statistic was undefined.
+
+Most cells use the warp-speed method (one bootstrap resample per replication, critical
+value from the pooled bootstrap statistics); one cell runs the full bootstrap test
+(B = 99) per replication as a cross-check. Asymptotic and bootstrap rates come from the same
+replications. Intervals are 95% (Wilson for the asymptotic and exact rates; joint resampling
+of replications for warp-speed rates, which is wider because the critical value is itself
+estimated).
+
+| test | DGP | n | reps | asymptotic | bootstrap |
+|---|---|---|---|---|---|
+| ESR v3 (one-sided) | garch-t5 (size) | 1000 | 1000 | 0.013 [0.008, 0.022] | 0.043 [0.022, 0.061] |
+| ESR v3, exact bootstrap B = 99 | garch-t5 (size) | 1000 | 120 | 0.000 [0, 0.031] | 0.033 [0.013, 0.083] |
+| ESR v3 | garch-t5 (size) | 2000 | 400 | 0.020 [0.010, 0.039] | 0.043 [0.020, 0.068] |
+| strict ESR (v1) | garch-t5 (size) | 1000 | 1000 | 0.073 [0.058, 0.091] | 0.062 [0.041, 0.083] |
+| strict ESR (v1) | garch-t5 (size) | 2000 | 400 | 0.055 [0.037, 0.082] | 0.055 [0.033, 0.083] |
+| ESR v3 | scale-0.85 (power) | 1000 | 400 | 0.372 [0.327, 0.421] | 0.645 [0.593, 0.748] |
+| ESR v3 | normal-tails (power) | 1000 | 400 | 0.345 [0.300, 0.393] | 0.645 [0.580, 0.725] |
+| strict ESR (v1) | scale-0.85 (power) | 1000 | 400 | 0.185 [0.150, 0.226] | 0.145 [0.062, 0.323] |
+| strict ESR (v1) | normal-tails (power) | 1000 | 400 | 0.193 [0.157, 0.234] | 0.147 [0.080, 0.250] |
+
+- **The bootstrap fixes the conservative v3.** With 1,000 null replications the asymptotic
+  one-sided v3 test rejects 1.3%; the bootstrap rejects 4.3%, and its interval covers 5%. The
+  exact bootstrap cell agrees (3.3%, 120 replications). The bootstrap 5% critical value of
+  the t-statistic is about -1.06 at n = 1000 and -1.28 at n = 2000, against -1.645 for the
+  normal: the null distribution of the v3 statistic is shifted right and narrower than
+  N(0, 1), consistent with the bias and inflated standard error in section 3.
+- **Power of v3 nearly doubles** at the corrected size: 0.65 against 0.37 (understated
+  scale) and 0.35 (normal tails) for the asymptotic test, at n = 1000.
+- **Strict ESR (v1).** The asymptotic test is mildly oversized at n = 1000 (7.3%, interval
+  5.8-9.1%; the quick run's 200-replication cells could not resolve this) and close to 5% at
+  n = 2000. The bootstrap brings n = 1000 to 6.2% (interval covers 5%). Its power is not
+  measurably different from the asymptotic test's (the warp-speed power intervals are wide).
+- **Multiple testing.** Nine cells are reported; the statements above use each interval on
+  its own. None of them rests on a single interval barely excluding 5%.
+
+**esback directly.** `scripts/esback_null/` ran `esback::esr_backtest` (version 0.3.1, esreg
+0.6.2, R 4.6.0 in webR; asymptotic, package defaults) on 250 `garch-t5` null samples
+(n = 1000, alpha = 2.5%, seed 20261024; `results/esback-null/`), and tailcheck on the same
+samples. No esback call failed.
+
+| p-value | rejects at 5% | 5% quantile of p | median p |
+|---|---|---|---|
+| esback v3, one-sided | 0.000 [0, 0.015] | 0.171 | 0.58 |
+| tailcheck v3, one-sided | 0.000 [0, 0.015] | 0.160 | 0.57 |
+| esback v3, two-sided | 0.032 [0.016, 0.062] | 0.085 | 0.56 |
+| esback v1 | 0.080 [0.052, 0.120] | 0.040 | 0.61 |
+| tailcheck v1, esreg's G2'' | 0.080 [0.052, 0.120] | 0.040 | 0.61 |
+| tailcheck v1, correct G2'' | 0.064 [0.040, 0.101] | 0.028 | 0.60 |
+
+So `esback`'s asymptotic one-sided v3 test is conservative in the same way (no rejection in
+250 null samples); this is now measured, not inferred from fixture agreement. On these 250
+samples tailcheck (with esreg's G2'') and esback agree to a median absolute difference of
+0.0005 (v3) and 0.0013 (v1) in p-value, and reach the same decision at 5% in every
+replication; the largest v1 difference is 0.057 (3 replications differ by more than 0.01),
+larger than the 0.006 seen on the fixtures. The cause was not traced per replication; a
+different local optimum of the M-estimator (both use random starts) is the likely reason.
 
 ## 4. Study results
 
@@ -326,9 +401,12 @@ Per-regime tests (Kupiec, strict ESR, ESR v3, FZ0, Acerbi-Szekely) are in
 - **Few exceedances.** At 1% the equity series have 6 to 26 exceedances. ESR, McNeil-Frey and
   Acerbi-Szekely have little power there, and the ESR asymptotics are least reliable
   (section 3).
-- **Quick profile only.** Parameters are refit every 21 days, ESR p-values are asymptotic (no
-  bootstrap), and the Monte Carlo uses 200 replications per ESR size cell, enough to detect
-  only gross size distortions (Wilson half-width about 0.03 at a 5% rate). The full-size
+- **Quick profile only.** Parameters are refit every 21 days, the study's ESR p-values are
+  asymptotic (no bootstrap), and the main Monte Carlo uses 200 replications per ESR size
+  cell, enough to detect only gross size distortions (Wilson half-width about 0.03 at a 5%
+  rate). The bootstrap ESR study (section 3.1) covers one level (2.5%), one null DGP and
+  n = 1000/2000; given its result, the study's v3 column understates evidence against the
+  forecasts and its strict-ESR column may slightly overstate it. The full-size
   configurations were not run.
 - **One sample period.** 2021-2026 contains several stress episodes but is one realisation;
   the results are not a general ranking of the forecasters.
@@ -346,9 +424,13 @@ Per-regime tests (Kupiec, strict ESR, ESR v3, FZ0, Acerbi-Szekely) are in
   cuts to the ESR replication counts at calibration time, when an ESR fit with the default
   covariance took 2-4 s at n = 2000 (partly BLAS oversubscription, since fixed); see
   section 3.
-- **Full-size profiles** are projected, not measured: about 20-30 CPU-hours for
-  `configs/study_full.toml` (dominated by the ESR bootstrap, about 0.45 s per replicate) and
-  35-45 for `configs/mc_full.toml` (see the config headers).
+- **Full-size profiles** are projected, not measured. A re-timing of sampled units on
+  2026-10-24 (`scripts/retime_full.py`, `results/retime-full.json`) measured 59 CPU-hours for
+  `configs/study_full.toml` (ESR bootstrap 50, at 0.8-1.6 s per resample) and 145 for
+  `configs/mc_full.toml`, on a machine that was heavily loaded by other jobs: a reference fit
+  took 1.4-2.6 times as long as on a quieter machine. Scaled by that factor the estimates are
+  roughly 23-42 and 55-105 CPU-hours; the 0.1.0 projections (20-30 and 35-45) were too low
+  for the Monte Carlo profile.
 
 ## 6. Reproduce
 
@@ -359,6 +441,10 @@ uv run tailcheck study run    --config configs/study.toml --workers 4
 uv run tailcheck study report --config configs/study.toml
 uv run tailcheck mc run       --config configs/mc_quick.toml --workers 4
 uv run tailcheck mc report    --config configs/mc_quick.toml
+# section 3.1 (about 5 CPU-hours; sessions of at most --max-minutes, rerun to resume)
+uv run tailcheck mc boot-run    --config configs/mc_esr_boot.toml --workers 3 --max-minutes 36
+uv run tailcheck mc boot-report --config configs/mc_esr_boot.toml
+# esback on null data (Node 20+; steps in scripts/esback_null/esback_null.py)
 ```
 
 Runs resume from `runs/<name>/units/`. The download depends on the sources serving the same

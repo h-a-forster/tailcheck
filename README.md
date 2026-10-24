@@ -39,6 +39,11 @@ Acerbi-Szekely tests (searched 2026-10-23).
   [docs/esreg-covariance.md](docs/esreg-covariance.md).
 - **Size and power.** A Monte Carlo study reports the rejection rate of every test at the
   sample sizes used in practice, with Wilson intervals. See [REPORT.md](REPORT.md).
+- **ESR v3: use the bootstrap.** The asymptotic one-sided intercept test (v3) is
+  conservative, in tailcheck and in `esback` alike (about 0-2% rejections at 5% under the
+  null; `esback` 0 of 250). With `n_boot > 0` the bootstrap p-value rejected 4.3% of 1,000
+  null samples and had nearly twice the power (REPORT section 3.1). It costs about 0.3-0.5 s
+  per resample at n = 1000-2000.
 
 ## Install
 
@@ -74,7 +79,8 @@ christoffersen_cc(r, q, 0.025).pvalue
 dynamic_quantile(r, q, 0.025, lags=4).pvalue
 mcneil_frey(r, q, e, sigma=s, n_boot=2000, seed=1).pvalue
 esr_backtest(r, e, 0.025, version=1, seed=1).pvalue  # strict ESR, Wald chi2(2)
-esr_backtest(r, e, 0.025, version=3, seed=1).pvalue  # one-sided intercept test
+esr_backtest(r, e, 0.025, version=3, seed=1).pvalue  # one-sided intercept test (conservative)
+esr_backtest(r, e, 0.025, version=3, n_boot=499, seed=1).details["pvalue_bootstrap"]  # preferred
 fz0_loss(r, q, e, 0.025).mean()
 ```
 
@@ -119,6 +125,8 @@ uv run tailcheck study run    --config configs/study.toml --workers 4
 uv run tailcheck study report --config configs/study.toml   # writes results/study-v1/
 uv run tailcheck mc run       --config configs/mc_quick.toml --workers 4
 uv run tailcheck mc report    --config configs/mc_quick.toml
+uv run tailcheck mc boot-run    --config configs/mc_esr_boot.toml --max-minutes 36  # bootstrap ESR size/power
+uv run tailcheck mc boot-report --config configs/mc_esr_boot.toml
 ```
 
 Every long run is checkpointed per unit under `runs/<name>/units/` and resumes where it

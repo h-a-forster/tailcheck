@@ -536,6 +536,11 @@ on the same samples with and without esreg's G2'' (`results/esback-null/`). This
 the earlier inference ("tailcheck matches esback on fixtures, so esback is probably
 conservative too") with a direct measurement.
 
+**Result** (REPORT.md section 3.1): bootstrap v3 size 4.3% (n = 1000, 1,000 replications)
+and 4.3% (n = 2000, 400), against 1.3% and 2.0% asymptotically; exact-bootstrap cross-check
+3.3% (120); `esback` v3 one-sided 0 of 250. The bootstrap is therefore the recommended v3
+p-value; the asymptotic one stays the default because it costs one fit instead of B + 1.
+
 ## 7. Validation and test strategy
 
 Layers, each in `tests/`:

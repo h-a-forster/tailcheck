@@ -1,0 +1,22 @@
+{
+  "cells": 9,
+  "replications": 2320,
+  "config_hash": "c35185f6c450a45f",
+  "run_manifest": {
+    "config_hash": "c35185f6c450a45f",
+    "inputs": {
+      "tailcheck": "0.1.0"
+    },
+    "source_hash": "b2c8890ae38cf0e1",
+    "versions": {
+      "python": "3.13.1",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1",
+      "pandas": "3.1.0",
+      "arch": "8.0.0",
+      "tailcheck": "0.1.0"
+    },
+    "started": "2026-10-23T21:52:28+00:00",
+    "platform": "win32"
+  }
+}

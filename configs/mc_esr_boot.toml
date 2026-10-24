@@ -5,9 +5,12 @@
 # p-value of the same replications.
 # Calibrated 2026-10-23 (configs/mc_esr_boot_calib.toml): about 2.7 s per warp replication
 # (v1 + v3) at n = 1000, 5.8 s at n = 2000, and 0.33 s per bootstrap fit; this profile is
-# about 11,000 CPU-seconds (about 70 minutes of wall time on 3 workers).
-# Full size (same cells, reps x 5, exact n_boot = 499; about 15 CPU-hours): copy this file,
-# change the reps, n_boot, name and out_dir, then run it the same way.
+# about 11,000 CPU-seconds (about 70 minutes of wall time on 3 workers). Measured
+# 2026-10-24 on a machine shared with other jobs: 305 CPU-minutes, four sessions of
+# `--max-minutes 36` on 2-3 workers (results/mc-esr-boot/).
+# Full size (warp reps x 5; exact cell 300 reps with n_boot = 199): about 18 + 7 = 25
+# CPU-hours at the measured rate (0.42 s per bootstrap fit). Copy this file, change the reps,
+# n_boot, name and out_dir, and run it the same way.
 name = "mc-esr-boot"
 seed = 20261024
 level = 0.05

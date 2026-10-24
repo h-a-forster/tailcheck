@@ -4,6 +4,10 @@
 # and 5000 (about 33 CPU-hours), plus about 5-8 CPU-hours for the other tests and the
 # per-chunk Acerbi-Szekely null samples. Resumable: completed chunks are skipped on rerun.
 # The bootstrap ESR size study has its own runner (configs/mc_esr_boot.toml, DESIGN 6.1).
+# Re-timed 2026-10-24 (scripts/retime_full.py, results/retime-full.json) on a loaded shared
+# machine: 145 CPU-hours as measured (ESR 133: 4.9, 7.6-7.9, 13.6-15.7 and 47-63 s per
+# replication at n = 500, 1000, 2000, 5000); a reference fit ran 1.4-2.6 times slower than
+# on a quieter machine, so roughly 55-105 CPU-hours idle. The projection above is too low.
 name = "mc-full"
 seed = 20261023
 level = 0.05

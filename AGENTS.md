@@ -51,11 +51,13 @@ and equity indices.
 | `src/tailcheck/forecasters/` | hs, gjr-t, fhs, evt-pot, caviar-sav | M6 |
 | `src/tailcheck/data.py` | Binance + FRED download, cache, returns | M7 |
 | `src/tailcheck/study/` | study runner + report | M7, M9 |
-| `src/tailcheck/montecarlo/` | DGPs, MC runner + report | M8 |
+| `src/tailcheck/montecarlo/` | DGPs, MC runner + report; `esr_boot.py` bootstrap ESR size/power (warp-speed + exact) | M8, DESIGN 6.1 |
 | `src/tailcheck/cli.py` | `tailcheck backtest / mc / study / data` | M10 |
 | `configs/` | study and Monte Carlo configs (quick + full) | - |
 | `scripts/reference_values.py` | independent recomputation of the reference values in DESIGN | done |
 | `scripts/r_fixtures/` | webR runner (`run_r.mjs`) for R oracle fixtures | runner done; R scripts M4 |
+| `scripts/esback_null/` | esback asymptotic ESR on simulated null data (webR) vs tailcheck | DESIGN 6.1 |
+| `scripts/retime_full.py` | re-time samples of the full-size profiles | - |
 | `tests/fixtures/r/` | committed R inputs (CSV) and outputs (JSON) | M4 |
 
 ## How to test
@@ -87,6 +89,8 @@ uv run tailcheck study run   --config configs/study.toml --workers 4      # abou
 uv run tailcheck study report --config configs/study.toml                 # results/study-v1/ (REPORT.md is written by hand)
 uv run tailcheck mc run      --config configs/mc_quick.toml --workers 4   # about 45 CPU-min, 12 min wall
 uv run tailcheck mc report   --config configs/mc_quick.toml
+uv run tailcheck mc boot-run --config configs/mc_esr_boot.toml --workers 3 --max-minutes 36  # rerun until done
+uv run tailcheck mc boot-report --config configs/mc_esr_boot.toml
 ```
 
 Full size: `configs/study_full.toml` (daily refits, bootstrap ESR; projected 20-30
@@ -100,7 +104,7 @@ long run, validate on a small sample, wrap it in a resume-on-failure loop, and w
 
 ## Status and next steps
 
-Updated: 2026-10-23.
+Updated: 2026-10-24.
 
 Done:
 - Scaffold, `docs/DESIGN.md`, research checks (FRED instead of Stooq; Binance ms->us
@@ -156,16 +160,31 @@ Done:
 - Tests: see the latest commit message for counts (`uv run pytest`; `--runslow` also
   runs the slow Monte Carlo and R-fixture checks; 2 documented skips: iid sparsity vs
   esreg).
+- Round 2 (2026-10-24):
+  - Bootstrap ESR size/power study (`montecarlo/esr_boot.py`, `configs/mc_esr_boot.toml`,
+    `tailcheck mc boot-run|boot-report`, `results/mc-esr-boot/`, REPORT 3.1). 2,320
+    replications, 305 CPU-min, four resumed sessions (`--max-minutes 36`). Bootstrap v3 size
+    4.3% (asymptotic 1.3%), power about 0.65 vs 0.35-0.37; strict ESR asymptotic 7.3% at
+    n = 1000, bootstrap 6.2%.
+  - esback directly on 250 null samples (`scripts/esback_null/`, `results/esback-null/`):
+    v3 one-sided 0/250, same as tailcheck; same 5% decisions in all 250; max v1 p-value
+    difference 0.057 (3 reps > 0.01; not traced, likely different local optima).
+  - Monte Carlo report: chunk-clustered intervals + design effect; Acerbi-Szekely design
+    effect about 1.05, same as tests with nothing shared (REPORT 3).
+  - `run_units(max_seconds=...)`: time-budgeted sessions; queued units are cancelled.
+  - Full-profile re-timing (`scripts/retime_full.py`, `results/retime-full.json`), on a
+    loaded machine: mc_full 145 CPU-hours as measured, study_full 59; a reference fit was
+    1.4-2.6x slower than on a quieter machine, so roughly 55-105 and 23-42 idle. The 0.1.0
+    projections (35-45, 20-30) were too low for mc_full. Re-time on an idle machine.
 
 Next (not done):
-- Full-size profiles (`configs/study_full.toml`, `configs/mc_full.toml`; projected 20-30 and
-  35-45 CPU-hours). Re-time a few units first: the projections predate the BLAS fix and
-  may be pessimistic.
-- ESR bootstrap size study (no Monte Carlo runner path yet; would answer whether the
-  bootstrap fixes the conservative v3).
-- Running `esback` itself on simulated null data (webR) to confirm directly that its v3 is
-  conservative; currently inferred from matching p-values on fixtures.
-- Acerbi-Szekely Wilson intervals still treat the replications of a chunk as independent
-  although they share one null sample (documented in REPORT section 3).
+- Full-size profiles (`configs/study_full.toml`, `configs/mc_full.toml`); see the re-timing
+  above for the cost. Run on an otherwise idle machine and re-time first.
+- Bootstrap ESR at alpha = 1% and on `iid-t5`; bootstrap p-values in the study (the quick
+  study's v3 column is conservative, REPORT 3.1). Full-size boot profile: warp reps x 5, exact
+  cell 300 reps with n_boot = 199 (about 25 CPU-hours, see the config header).
+- Trace the 3 replications where tailcheck (esreg G2'') and esback v1 p-values differ by
+  more than 0.01 (`results/esback-null/pvalues.csv`, reps 086, 076, 035): compare the
+  M-estimator losses at both optima.
 - Tagging v0.1.0 and publishing (needs the owner's go-ahead). Re-running anything: resume
 from `runs/<name>/units/`; delete a run directory only to start over.

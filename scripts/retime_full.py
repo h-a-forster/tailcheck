@@ -10,7 +10,12 @@ runs themselves: it times a few reduced units and multiplies out.
   asset (needs ``tailcheck data fetch`` first), and the per-resample cost of the bootstrap
   ESR at the out-of-sample lengths.
 
-Writes ``results/retime-full.json``.
+Writes ``results/retime-full.json``. Timings depend on machine load, so each run also
+times a fixed reference fit (strict ESR, ``garch-t5``, n = 1000, seed 1) before and after;
+compare it with an idle-machine timing of the same fit to scale the projection
+(``uv run python scripts/retime_full.py reference`` times only the reference fit). On
+2026-10-23, with the machine less loaded, the reference fit took 1.24 s; during the
+2026-10-24 re-timing it took 3.24 s (start) and 1.75 s (end).
 
     uv run python scripts/retime_full.py
 """
@@ -29,6 +34,20 @@ import numpy as np  # noqa: E402
 
 REPS_ESR, REPS_CHEAP, DAYS, BOOT = 2, 20, 15, 4
 OUT = Path("results/retime-full.json")
+
+
+def reference_seconds(repeats: int = 3) -> float:
+    """Median time of one fixed strict-ESR backtest (load indicator)."""
+    from tailcheck.esr_backtest import esr_backtest
+    from tailcheck.montecarlo.dgp import simulate
+
+    s = simulate("garch-t5", 1000, 0.025, np.random.default_rng(1))
+    out = []
+    for _ in range(repeats):
+        t0 = time.perf_counter()
+        esr_backtest(s.r, s.e, 0.025, 1, seed=1)
+        out.append(time.perf_counter() - t0)
+    return float(np.median(out))
 
 
 def time_mc_full() -> dict[str, object]:
@@ -126,15 +145,22 @@ def time_study_full() -> dict[str, object]:
 
 
 def main() -> None:
+    import sys
+
     from tailcheck import __version__
 
-    out = {
+    if sys.argv[1:] == ["reference"]:
+        print(f"reference fit: {reference_seconds(5):.3f} s")
+        return
+    ref_start = reference_seconds()
+    out: dict[str, object] = {
         "date": time.strftime("%Y-%m-%d"),
         "tailcheck": __version__,
         "method": "single process, BLAS threads 1, reduced units timed and multiplied out",
         "mc_full": time_mc_full(),
         "study_full": time_study_full(),
     }
+    out["reference_fit_seconds"] = {"start": ref_start, "end": reference_seconds()}
     OUT.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps(out, indent=2))
 

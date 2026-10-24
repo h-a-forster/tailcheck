@@ -73,3 +73,15 @@ def test_report_without_run_is_clean_error(
     assert main(["study", "report", "--config", str(cfg)]) == 2
     assert "no run found" in capsys.readouterr().err
     assert not (tmp_path / "results").exists() and not (tmp_path / "runs").exists()
+
+
+def test_mc_boot_subcommands_parse() -> None:
+    from tailcheck.cli import build_parser
+
+    args = build_parser().parse_args(
+        ["mc", "boot-run", "--config", "c.toml", "--workers", "2", "--max-minutes", "5"]
+    )
+    assert args.action == "boot-run" and args.max_minutes == 5.0 and args.workers == 2
+    assert build_parser().parse_args(["mc", "boot-report", "--config", "c.toml"]).action == (
+        "boot-report"
+    )

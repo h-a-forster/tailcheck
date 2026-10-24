@@ -3,6 +3,29 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `tailcheck.montecarlo.esr_boot` and `tailcheck mc boot-run | boot-report`: size and power
+  of the bootstrap ESR tests, by the warp-speed method (one resample per replication) and
+  by the full bootstrap, paired with the asymptotic p-values of the same replications.
+  Config `configs/mc_esr_boot.toml`; results in `results/mc-esr-boot/`.
+- `run_units(max_seconds=...)` and `--max-minutes` on `mc boot-run`: stop starting units
+  after a time budget; a rerun resumes.
+- Monte Carlo report: chunk-clustered intervals (`lo_chunk`, `hi_chunk`) and the design
+  effect per cell in `size_power.csv`.
+- `scripts/esback_null/`: `esback`'s asymptotic ESR tests on simulated null data through
+  webR, next to tailcheck on the same samples (`results/esback-null/`).
+- `scripts/retime_full.py`: re-times samples of the full-size profiles
+  (`results/retime-full.json`).
+
+### Findings
+
+- The bootstrap restores the size of the one-sided ESR v3 test (4.3% at 5%, against 1.3%
+  asymptotically) and nearly doubles its power; `esback`'s asymptotic v3 is equally
+  conservative (0 of 250 null samples). See REPORT section 3.1.
+
 ## [0.1.0] - unreleased
 
 First feature-complete version. Not tagged and not on PyPI.
