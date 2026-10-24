@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tailcheck.checkpoint import UnitStore
+from tailcheck.checkpoint import UnitStore, config_hash
 from tailcheck.data import (
     load_returns,
     log_returns_pct,
@@ -87,14 +87,18 @@ def _smoke(tmp_path: Path) -> None:
     for i, a in enumerate(("AAA", "BBB")):
         _write_synthetic(tmp_path / "data", a, 360, i)
     cfg_path = _toml(tmp_path)
-    out = runner.run_study(cfg_path, workers=1, stages=("forecast",))
-    store = UnitStore(out, runner.config_hash(runner.load_config(cfg_path)))
+    cfg = runner.load_config(cfg_path)
+    res = runner.run_study(cfg_path, workers=1, stages=("forecast",))
+    assert not res.complete and res.done == 4 and res.failed == 0  # stages left to run
+    out = res.out_dir
+    store = UnitStore(out, config_hash(runner.load_config(cfg_path)))
     done = set(store.completed())
     assert done == {f"forecast__{a}__{m}" for a in ("AAA", "BBB") for m in ("hs", "gjr-t")}
     # simulate a crash: drop one finished unit, rerun, and check only it is recomputed
     store.path("forecast__AAA__hs").unlink()
     before = store.read("forecast__BBB__gjr-t")["seconds"]
-    runner.run_study(cfg_path, workers=1)
+    res = runner.run_study(cfg_path, workers=1)
+    assert res.complete and res.done == res.expected == len(runner.study_unit_ids(cfg))
     assert store.read("forecast__BBB__gjr-t")["seconds"] == before
     assert store.done("forecast__AAA__hs")
     bt = store.read("backtest__AAA__gjr-t__0.025")
@@ -109,6 +113,30 @@ def _smoke(tmp_path: Path) -> None:
     tables = collect_study(cfg_path)
     assert len(tables["backtests"]) == 4
     assert {"esr_v1_p_holm", "esr_v1_q_bh"} <= set(tables["backtests"].columns)
+    _check_partial_report(tmp_path, cfg_path, store)
+
+
+def _check_partial_report(tmp_path: Path, cfg_path: Path, store: UnitStore) -> None:
+    """A report on a partial run refuses (or, when allowed, says it is partial)."""
+    import contextlib
+
+    from tailcheck.checkpoint import IncompleteRunError
+    from tailcheck.study.report import write_study_report
+
+    results = tmp_path / "results" / "smoke"
+    with contextlib.chdir(tmp_path):
+        write_study_report(cfg_path)
+        assert json.loads((results / "summary.json").read_text())["complete"] is True
+        store.path("backtest__BBB__hs__0.025").unlink()  # e.g. a failed or unfinished unit
+        before = (results / "summary.json").read_text()
+        with pytest.raises(IncompleteRunError, match="9/10 units done"):
+            write_study_report(cfg_path)
+        assert (results / "summary.json").read_text() == before  # nothing written
+        write_study_report(cfg_path, allow_partial=True)
+    summary = json.loads((results / "summary.json").read_text())
+    assert summary["complete"] is False
+    assert (summary["expected"], summary["done"], summary["n_backtest_cells"]) == (10, 9, 3)
+    assert (results / "tables.md").read_text().startswith("**INCOMPLETE RUN: 9 of 10")
 
 
 def test_unit_seed_independent_of_order() -> None:
@@ -168,8 +196,10 @@ def test_compare_waits_for_all_forecasts(tmp_path: Path, monkeypatch: pytest.Mon
         return real(arg)
 
     monkeypatch.setattr(runner, "forecast_unit", flaky)
-    out = runner.run_study(cfg_path, workers=1, stages=("forecast", "compare"))
-    store = UnitStore(out, runner.config_hash(runner.load_config(cfg_path)))
+    res = runner.run_study(cfg_path, workers=1, stages=("forecast", "compare"))
+    assert res.failed == 1 and not res.complete
+    out = res.out_dir
+    store = UnitStore(out, config_hash(runner.load_config(cfg_path)))
     assert not store.done("forecast__AAA__hs")
     assert not store.done("compare__AAA__0.025")  # not run on a partial model set
     assert store.read("compare__BBB__0.025")["models"] == ["fhs", "gjr-t", "hs"]
@@ -191,12 +221,31 @@ def test_resume_refuses_changed_data(tmp_path: Path) -> None:
         _write_synthetic(tmp_path / "data", a, 360, i)
     cfg_path = _toml(tmp_path)
     cfg = runner.load_config(cfg_path)
-    UnitStore(Path(cfg["run"]["out_dir"]), runner.config_hash(cfg), inputs=runner.study_inputs(cfg))
+    UnitStore(Path(cfg["run"]["out_dir"]), config_hash(cfg), inputs=runner.study_inputs(cfg))
     _write_synthetic(tmp_path / "data", "AAA", 360, 99)  # re-fetched data differ
     from tailcheck.checkpoint import ConfigMismatchError
 
     with pytest.raises(ConfigMismatchError, match="different inputs"):
         runner.run_study(cfg_path, workers=1, stages=("forecast",))
+
+
+def test_config_hash_ignores_workers_and_accepts_legacy(tmp_path: Path) -> None:
+    from tailcheck.checkpoint import legacy_config_hash, store_for
+
+    cfg = runner.load_config(_toml(tmp_path))
+    other = {**cfg, "run": {**cfg["run"], "workers": 3}}
+    assert config_hash(cfg) == config_hash(other)
+    assert legacy_config_hash(cfg) != legacy_config_hash(other)
+    assert config_hash(cfg) != config_hash({**cfg, "seed": 8})
+    assert cfg["run"]["workers"] == 1  # hashing does not mutate the config
+    # a run started under the old (whole-config) hash still resumes and reports
+    UnitStore(Path(cfg["run"]["out_dir"]), legacy_config_hash(cfg))
+    store_for(cfg, read_only=True)
+    assert store_for(cfg).manifest["config_hash"] == legacy_config_hash(cfg)
+    # a new run resumes after [run] workers is edited in the config
+    fresh = {**cfg, "run": {**cfg["run"], "out_dir": str(tmp_path / "runs" / "fresh")}}
+    store_for(fresh)
+    store_for({**fresh, "run": {**fresh["run"], "workers": 3}})
 
 
 def test_configured_workers() -> None:
@@ -224,7 +273,7 @@ def test_reports_without_run_write_nothing(tmp_path: Path, monkeypatch: pytest.M
     assert not (tmp_path / "runs").exists()
     # an existing but empty run directory: clear error, still nothing written
     cfg = runner.load_config(cfg_path)
-    UnitStore(Path(cfg["run"]["out_dir"]), runner.config_hash(cfg))
+    UnitStore(Path(cfg["run"]["out_dir"]), config_hash(cfg))
     with pytest.raises(ValueError, match="no completed backtest units"):
         write_study_report(cfg_path)
     assert sorted(p.name for p in committed.parent.iterdir()) == ["backtests.csv"]

@@ -85,3 +85,31 @@ def test_mc_boot_subcommands_parse() -> None:
     assert build_parser().parse_args(["mc", "boot-report", "--config", "c.toml"]).action == (
         "boot-report"
     )
+
+
+@pytest.mark.parametrize(
+    ("result", "code", "text"),
+    [
+        ((4, 4, 0, False), 0, "units done: 4/4; failed this session: 0; complete"),
+        ((2, 4, 0, True), 3, "stopped at the time budget; INCOMPLETE"),
+        ((3, 4, 1, False), 3, "failed this session: 1; INCOMPLETE"),
+    ],
+)
+def test_run_exit_code_reports_incomplete_runs(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    result: tuple[int, int, int, bool],
+    code: int,
+    text: str,
+) -> None:
+    from tailcheck.checkpoint import RunResult
+    from tailcheck.montecarlo import esr_boot
+
+    done, expected, failed, stopped = result
+    monkeypatch.setattr(
+        esr_boot,
+        "run_boot_mc",
+        lambda *a, **k: RunResult(Path("runs/x"), expected, done, failed, stopped),
+    )
+    assert main(["mc", "boot-run", "--config", "x.toml", "--max-minutes", "1"]) == code
+    assert text in capsys.readouterr().out

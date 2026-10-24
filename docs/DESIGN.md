@@ -305,7 +305,7 @@ Nuisance estimators:
   Check at n = 200,000 against the normal and t5 closed forms (within 3%).
 - `bandwidth_sj`: implement from Sheather and Jones (1991) with exact (unbinned) pairwise
   sums, O(n^2) on at most a few thousand points. R's `bw.SJ` bins to 1000 points. Tolerance
-  vs R: 2% relative.
+  vs R: 1% relative (observed 0.5%).
 
 #### 4.3.4 ESR backtests (`esr_backtest`)
 
@@ -389,7 +389,16 @@ processed return series), a hash of the package source, the Python/numpy/scipy/a
 and the start time. A mismatched config hash or `inputs` raises unless `--force-new`, so a
 resume never mixes units computed on different data. A changed source hash only warns (and
 writes a `progress.log` line), because documentation edits should not invalidate a long run.
-Reports open the store read-only: they create nothing and fail cleanly when there is no run. Each unit is written to `root/units/<safe_id>.json` (or `.npz` for
+The config hash excludes operational keys (`[run] workers`), so changing the worker count in
+the config does not block a resume; a manifest written under the older whole-config hash is
+still accepted. Each run session returns `RunResult` (units done/expected over the whole
+grid, failures, whether it stopped at a time budget); the CLI prints it and exits 3 when the
+run is incomplete, so a resume loop can tell "done" from "stopped". Reports open the store
+read-only: they create nothing and fail cleanly when there is no run. They compare the
+finished units with the configured grid and refuse a partial run (multiple-testing
+adjustments over a subset would be too lenient) unless `--allow-partial`, in which case
+`summary.json` records `complete: false` with the expected and done counts and the markdown
+starts with an INCOMPLETE banner. Each unit is written to `root/units/<safe_id>.json` (or `.npz` for
 arrays) through a temporary file and `os.replace`. `done(id)` checks existence and a
 `complete: true` field. A progress line is appended to `root/progress.log`:
 `ISO time | unit | seconds | done/total`. Runners take the todo list, skip units that are
@@ -568,11 +577,18 @@ Layers, each in `tests/`:
        scale-0.85, normal-tails; n = 1500, alpha = 0.025 and 0.01);
    (f) `er_backtest` with B = 20,000.
    Also record R and package versions in `outputs/r_versions.json`.
-   Tolerances: QR coefficients 1e-6. vcov at R's coefficients: 1e-6 relative for iid/ind and
-   scl_N, 2e-2 for scl_sp (KDE binning differs), with misspec=TRUE expected to differ only
-   through the G2'' term. esreg fit: our loss <= R loss + 1e-7 and coefficients within
-   0.05 SE (the ILS is random in both). ESR p-values: absolute difference <= 0.01 for
-   nid/scl_N and <= 0.03 for nid/scl_sp. er_backtest: <= 0.02.
+   Tolerances (tightened in round 3 to about 2.5x the observed agreement): QR coefficients
+   1e-10. vcov at R's coefficients: 1e-5 relative for scl_N, 1e-2 for scl_sp (KDE binning
+   differs), with misspec=TRUE expected to differ only through the G2'' term (iid sparsity
+   is skipped, see section 12). esreg fit: our loss <= R loss + 1e-7 and coefficients within
+   0.05 SE (the ILS is random in both). ESR p-values: absolute difference <= 0.01 (observed
+   0.006). er_backtest: <= 0.02.
+   (g) `scripts/r_fixtures/esr_boot_fixture.R`: `esr_backtest` bootstrap p-values (B = 499,
+   `outputs/r_esr_bootstrap.json`) for v3 and v1 on the scale-0.85 set and v3 on the correct
+   set at alpha = 0.025. The random streams differ, so the slow test compares with the same B
+   at an absolute tolerance of 0.1 (about 3 sd of a difference); the misspecified cases have
+   small p-values that a centring or tail-direction error would move far. A fast test runs
+   the bootstrap on hand-built resamples with known statistics.
    Command (from repo root; needs Node 20+):
    `npm ci --ignore-scripts --prefix scripts/r_fixtures` then
    `node scripts/r_fixtures/run_r.mjs scripts/r_fixtures/<script>.R tests/fixtures/r esreg esback quantreg`.

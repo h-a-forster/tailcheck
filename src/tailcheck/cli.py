@@ -11,6 +11,8 @@ from tailcheck import __version__
 
 STAGES = ("forecast", "backtest", "compare")
 WORKERS_HELP = "worker processes (default: [run] workers in the config, else 4; capped at 4)"
+PARTIAL_HELP = "report an unfinished run (outputs are marked incomplete)"
+EXIT_INCOMPLETE = 3  # a run session ended with units still to do (stopped or failed)
 
 
 def _stages(text: str) -> tuple[str, ...]:
@@ -57,6 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     srep = study_sub.add_parser("report")
     srep.add_argument("--config", type=Path, required=True)
+    srep.add_argument("--allow-partial", action="store_true", help=PARTIAL_HELP)
 
     mc = sub.add_parser("mc", help="Monte Carlo size/power: run | report | boot-run | boot-report")
     mc_sub = mc.add_subparsers(dest="action", required=True)
@@ -66,6 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     mr.add_argument("--force-new", action="store_true")
     mrep = mc_sub.add_parser("report")
     mrep.add_argument("--config", type=Path, required=True)
+    mrep.add_argument("--allow-partial", action="store_true", help=PARTIAL_HELP)
     mbr = mc_sub.add_parser("boot-run", help="bootstrap ESR size/power (configs/mc_esr_boot.toml)")
     mbr.add_argument("--config", type=Path, required=True)
     mbr.add_argument("--workers", type=int, default=None, help=WORKERS_HELP)
@@ -78,6 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     mbrep = mc_sub.add_parser("boot-report")
     mbrep.add_argument("--config", type=Path, required=True)
+    mbrep.add_argument("--allow-partial", action="store_true", help=PARTIAL_HELP)
     return parser
 
 
@@ -193,11 +198,11 @@ def _dispatch(args: argparse.Namespace) -> int:
                 force_new=args.force_new,
                 stages=args.stages,
             )
-            print(f"run directory: {out}")
-            return 0
+            print(out.describe())
+            return 0 if out.complete else EXIT_INCOMPLETE
         from tailcheck.study.report import write_study_report
 
-        print(write_study_report(args.config))
+        print(write_study_report(args.config, allow_partial=args.allow_partial))
         return 0
     if args.command == "mc":
         if args.action == "boot-run":
@@ -209,22 +214,22 @@ def _dispatch(args: argparse.Namespace) -> int:
                 force_new=args.force_new,
                 max_minutes=args.max_minutes,
             )
-            print(f"run directory: {out}")
-            return 0
+            print(out.describe())
+            return 0 if out.complete else EXIT_INCOMPLETE
         if args.action == "boot-report":
             from tailcheck.montecarlo.esr_boot import write_boot_report
 
-            print(write_boot_report(args.config))
+            print(write_boot_report(args.config, allow_partial=args.allow_partial))
             return 0
         if args.action == "run":
             from tailcheck.montecarlo.runner import run_mc
 
             out = run_mc(args.config, workers=args.workers, force_new=args.force_new)
-            print(f"run directory: {out}")
-            return 0
+            print(out.describe())
+            return 0 if out.complete else EXIT_INCOMPLETE
         from tailcheck.montecarlo.report import write_mc_report
 
-        print(write_mc_report(args.config))
+        print(write_mc_report(args.config, allow_partial=args.allow_partial))
         return 0
     return 2  # pragma: no cover
 

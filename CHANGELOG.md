@@ -20,8 +20,31 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `scripts/retime_full.py`: re-times samples of the full-size profiles
   (`results/retime-full.json`).
 
+### Changed
+
+- Run sessions (`study run`, `mc run`, `mc boot-run`) print units done/expected, failures
+  and whether they stopped at the time budget, and exit with code 3 when the run is
+  incomplete. The Python functions return `RunResult` instead of the run directory.
+- Reports (`study report`, `mc report`, `mc boot-report`) refuse a partial run unless
+  `--allow-partial`; `summary.json` now records `complete`, `expected` and `done`.
+- The run config hash ignores `[run] workers`; runs started under the old hash still resume.
+  Hashes quoted in REPORT.md and the committed `summary.json` files are the old
+  whole-config hashes; a regenerated report prints the new one.
+- The sdist now includes `examples/` (used by the CLI test and the quick start) and
+  `REPORT.md`.
+- Tighter R-fixture tolerances (quantile regression 1e-10, covariance 1e-5 / 1%, ESR
+  p-values 0.01, `bw.SJ` 1%).
+
+### Fixed
+
+- `christoffersen_independence`: a single hit on the first day no longer reports
+  `reason = "no exceedances"`; it reports `"no transitions into a hit"`.
+
 ### Findings
 
+- The asymptotic ESR v3 test is conservative because the ES-intercept standard error is
+  negatively correlated with the estimate (about -0.5), not because of bias (0.09 sd) or a
+  uniformly inflated SE; an oracle-SE test has correct size (REPORT section 3).
 - The bootstrap restores the size of the one-sided ESR v3 test (4.3% at 5%, against 1.3%
   asymptotically) and nearly doubles its power; `esback`'s asymptotic v3 is equally
   conservative (0 of 250 null samples). See REPORT section 3.1.

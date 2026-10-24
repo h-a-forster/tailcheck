@@ -21,6 +21,7 @@ import time
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -39,10 +40,107 @@ class RunNotFoundError(FileNotFoundError):
     """A read-only store was opened on a directory without a run manifest."""
 
 
-def config_hash(config: Mapping[str, Any]) -> str:
-    """Stable SHA-256 (first 16 hex chars) of a JSON-serialisable configuration."""
+class IncompleteRunError(ValueError):
+    """A report was asked for on a run whose expected units are not all done."""
+
+
+@dataclass(frozen=True)
+class RunResult:
+    """Outcome of one run session: the run directory and how far the run has got.
+
+    ``done``/``expected`` count completed units against the configured grid (including units
+    finished by earlier sessions); ``failed`` and ``stopped`` describe this session only.
+    """
+
+    out_dir: Path
+    expected: int
+    done: int
+    failed: int = 0
+    stopped: bool = False
+
+    @property
+    def complete(self) -> bool:
+        return self.done >= self.expected and self.failed == 0
+
+    def describe(self) -> str:
+        state = "complete" if self.complete else "INCOMPLETE (rerun to resume)"
+        stop = "; stopped at the time budget" if self.stopped else ""
+        return (
+            f"run directory: {self.out_dir}\n"
+            f"units done: {self.done}/{self.expected}; failed this session: {self.failed}"
+            f"{stop}; {state}"
+        )
+
+
+def completeness(store: UnitStore, expected_ids: Iterable[str]) -> dict[str, Any]:
+    """Count which of ``expected_ids`` are done in ``store``.
+
+    Returns ``{"complete", "expected", "done", "missing"}``; ``missing`` lists at most the
+    first 10 missing unit ids.
+    """
+    ids = list(dict.fromkeys(expected_ids))
+    have = set(store.completed())
+    missing = [u for u in ids if u not in have]
+    return {
+        "complete": not missing,
+        "expected": len(ids),
+        "done": len(ids) - len(missing),
+        "missing": missing[:10],
+    }
+
+
+def partial_banner(status: Mapping[str, Any]) -> str:
+    """One markdown line marking a report built from a partial run."""
+    return (
+        f"**INCOMPLETE RUN: {status['done']} of {status['expected']} units done.** Rates, "
+        "intervals and any multiple-testing adjustment cover the finished units only."
+    )
+
+
+def require_complete(status: Mapping[str, Any], allow_partial: bool, run_cmd: str) -> None:
+    """Raise :class:`IncompleteRunError` for a partial run unless ``allow_partial``."""
+    if status["complete"] or allow_partial:
+        return
+    raise IncompleteRunError(
+        f"run is incomplete: {status['done']}/{status['expected']} units done "
+        f"(first missing: {', '.join(status['missing'][:3])}); resume with `{run_cmd}`, or "
+        "pass --allow-partial to report the finished units (marked incomplete). "
+        "Nothing was written."
+    )
+
+
+# Keys that change how a run is executed but not what it computes: excluded from the hash,
+# so that e.g. lowering ``[run] workers`` in the config does not block a resume.
+OPERATIONAL_KEYS: tuple[tuple[str, str], ...] = (("run", "workers"),)
+
+
+def _hash(config: Mapping[str, Any]) -> str:
     blob = json.dumps(config, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
+def config_hash(config: Mapping[str, Any]) -> str:
+    """Stable SHA-256 (first 16 hex chars) of a configuration, without :data:`OPERATIONAL_KEYS`."""
+    cfg = {k: (dict(v) if isinstance(v, Mapping) else v) for k, v in config.items()}
+    for section, key in OPERATIONAL_KEYS:
+        if isinstance(cfg.get(section), dict):
+            cfg[section].pop(key, None)
+    return _hash(cfg)
+
+
+def legacy_config_hash(config: Mapping[str, Any]) -> str:
+    """Hash of the whole configuration, as used up to 0.1.0 (accepted when resuming)."""
+    return _hash(config)
+
+
+def store_for(config: Mapping[str, Any], **kwargs: Any) -> UnitStore:
+    """Open the run store of ``config`` (``[run] out_dir``), accepting the legacy hash."""
+    return UnitStore(
+        Path(config["run"]["out_dir"]),
+        config_hash(config),
+        accept_hashes=(legacy_config_hash(config),),
+        **kwargs,
+    )
 
 
 def safe_id(unit_id: str) -> str:
@@ -126,8 +224,12 @@ class UnitStore:
         force_new: bool = False,
         inputs: Mapping[str, Any] | None = None,
         read_only: bool = False,
+        accept_hashes: Iterable[str] = (),
     ) -> None:
         """Open (or create) the store.
+
+        ``accept_hashes``: further configuration hashes an existing manifest may carry (runs
+        started under an older hashing rule); the manifest keeps the hash it was created with.
 
         ``inputs`` describes what the configuration hash does not cover (input data hashes,
         package version). It is stored in the manifest; reopening with different ``inputs``
@@ -144,12 +246,13 @@ class UnitStore:
         self.units_dir = self.root / "units"
         self.log_path = self.root / "progress.log"
         self.read_only = read_only
+        ok_hashes = {config_hash, *accept_hashes}
         manifest = self.root / "manifest.json"
         if read_only:
             if not manifest.exists():
                 raise RunNotFoundError(f"no run found at {self.root} (manifest.json missing)")
             old = json.loads(manifest.read_text(encoding="utf-8"))
-            if old.get("config_hash") != config_hash:
+            if old.get("config_hash") not in ok_hashes:
                 raise ConfigMismatchError(
                     f"{self.root} holds results for config {old.get('config_hash')}, "
                     f"not {config_hash}"
@@ -162,7 +265,7 @@ class UnitStore:
         if manifest.exists():
             old = json.loads(manifest.read_text(encoding="utf-8"))
             problem = None
-            if old.get("config_hash") != config_hash:
+            if old.get("config_hash") not in ok_hashes:
                 problem = (
                     f"{self.root} holds results for config {old.get('config_hash')}, "
                     f"not {config_hash}"

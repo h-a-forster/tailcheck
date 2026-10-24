@@ -53,7 +53,7 @@ CASES = [
 @pytest.mark.parametrize("case", CASES)
 def test_esr_pvalues_match_esback_in_compat_mode(case: dict) -> None:
     """With esreg's G2'' reproduced, p-values match esback (DESIGN 7 tolerances)."""
-    tol = 0.01 if case["sigma_est"] == "scl_N" else 0.03
+    tol = 0.01  # observed maximum 0.006 over all 36 cases
     assert _run(case, compat=True) == pytest.approx(case["pvalue_twosided_asymptotic"], abs=tol)
 
 
@@ -112,3 +112,41 @@ def test_esr_v1_size_small_mc() -> None:
         r = s * draw_std_t(rng, 5.0, n)
         rej += esr_backtest(r, e * s, a, 1, sigma_est="scl_N", seed=1).reject()
     assert rej / reps <= 0.25
+
+
+# --- bootstrap p-values against esback's bootstrap (distributional check) ---------------
+
+BOOT_REF_PATH = FIX / "outputs" / "r_esr_bootstrap.json"
+BOOT_REF = json.loads(BOOT_REF_PATH.read_text()) if BOOT_REF_PATH.exists() else {"cases": []}
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "case", BOOT_REF["cases"], ids=[f"{c['set']}-v{c['version']}" for c in BOOT_REF["cases"]]
+)
+def test_esr_bootstrap_pvalues_match_esback(case: dict) -> None:
+    """Same data and B as esback's bootstrap; the random streams differ, so p-values agree
+    only within Monte Carlo error (sd of a difference <= 0.032 at B = 499). The misspecified
+    ``scale`` cases have small p-values that a centring or tail-direction error would push
+    towards 0.5 or 1."""
+    b = int(BOOT_REF["B"])
+    res = esr_backtest(
+        FC.r,
+        FC[f"e_{case['set']}_025"],
+        case["alpha"],
+        case["version"],
+        q=FC[f"q_{case['set']}_025"],
+        sigma_est="scl_sp",
+        n_boot=b,
+        seed=20261024,
+        _esreg_compat_g2pp=True,
+    )
+    d = res.details
+    assert d["n_boot_failed"] < 0.05 * b
+    if case["version"] == 3:
+        assert d["pvalue_bootstrap"] == pytest.approx(case["pvalue_onesided_bootstrap"], abs=0.1)
+        assert d["pvalue_bootstrap_two_sided"] == pytest.approx(
+            case["pvalue_twosided_bootstrap"], abs=0.1
+        )
+    else:
+        assert d["pvalue_bootstrap"] == pytest.approx(case["pvalue_twosided_bootstrap"], abs=0.1)

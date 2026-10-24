@@ -95,7 +95,7 @@ def test_quantile_regression_matches_r(i: int) -> None:
     x, y = _dgp2()
     ref = REF["rq"][i]
     b = quantile_regression(y, np.column_stack([np.ones_like(x), x]), ref["tau"])
-    np.testing.assert_allclose(b, ref["coef"], atol=1e-6)
+    np.testing.assert_allclose(b, ref["coef"], atol=1e-10)
 
 
 def test_quantile_regression_intercept_only_is_order_statistic() -> None:
@@ -178,8 +178,9 @@ def test_vcov_matches_r_at_r_coefficients(i: int) -> None:
         pytest.skip("iid sparsity differs from esreg (documented in docs/esreg-covariance.md)")
     fit = _fit_at(REF["vcov_coef"], y, x)
     r_cov = np.asarray(case["cov"]).reshape(4, 4)
-    # scl_N: 1e-4 (the location-scale PMLE optimisers differ slightly); scl_sp: KDE binning
-    tol = 1e-4 if case["sigma_est"] == "scl_N" else 2e-2
+    # observed: 4e-6 (scl_N; the location-scale PMLE optimisers differ slightly), 0.4% (scl_sp;
+    # KDE binning); tested with about 2.5x margin
+    tol = 1e-5 if case["sigma_est"] == "scl_N" else 1e-2
     compat, _ = vcov_details(
         fit, case["sparsity"], case["sigma_est"], case["misspec"], _esreg_compat_g2pp=True
     )
@@ -195,7 +196,7 @@ def test_vcov_matches_r_at_r_coefficients(i: int) -> None:
 def test_bandwidth_sj_matches_r() -> None:
     for i, ref in enumerate(REF["bw_sj"]):
         x = np.loadtxt(FIX / "inputs" / f"bw_{i}.csv", skiprows=1)
-        assert bandwidth_sj(x) == pytest.approx(ref, rel=0.02)
+        assert bandwidth_sj(x) == pytest.approx(ref, rel=0.01)
 
 
 def _remark_210(y: np.ndarray, fit: ESRegFit, f: float, v: float) -> np.ndarray:

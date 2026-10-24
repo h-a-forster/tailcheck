@@ -16,12 +16,13 @@ those files; the commands that rebuild them are at the end.
   n = 250 (8.6% and 10.1% at alpha = 1%, 7.3% at 2.5%; binomial discreteness); at
   alpha = 1% two larger-n `iid-t5` cells also miss 5% narrowly (6.1% at n = 1000, 3.8% at
   n = 2000), and its other 6 cells cover 5%. The dynamic quantile test is oversized at
-  1% (9-11%), Christoffersen independence is undersized everywhere (0.8-2.5%), and
+  1% (9-11%) and at 2.5% for n <= 1000 (6-8%), Christoffersen independence is undersized everywhere (0.8-2.5%), and
   McNeil-Frey is below 5% in every size cell (1.2-4.3%), clearly so at n = 250 and at
   n = 1000, alpha = 1% (1.2-2.9%). The strict ESR test rejects 5.5-8% of 200 null
   replications per cell (every Wilson interval reaches 5%); the one-sided ESR v3 test is
-  conservative (0-1%), mainly through a small positive finite-sample bias of the ES
-  intercept and an inflated standard error (section 3). `esback`'s asymptotic v3 rejects 0
+  conservative (0-1%) because the standard error of the ES intercept is negatively
+  correlated with the estimate (about -0.5): it is largest exactly when the estimate is
+  negative, the direction that would reject; the intercept's bias is negligible (section 3). `esback`'s asymptotic v3 rejects 0
   of 250 null samples too. The bootstrap restores the size of v3 (4.3% in 1,000 null
   replications, interval 2.2-6.1%) and nearly doubles its power (0.65 against 0.35-0.37);
   the strict ESR test is mildly oversized at n = 1000 asymptotically (7.3%) and 6.2% with
@@ -109,6 +110,7 @@ Fixtures from `esreg`, `esback` and `quantreg`, generated with
 | `vcovA`, nid/scl_sp | 0.4% relative (same proviso) |
 | `bw.SJ` on 3 samples | within 0.5% |
 | `esr_backtest`: 3 forecast sets x 2 levels x 3 versions x 2 covariance options | all 36 p-values within 0.006 with esreg's G2'' reproduced |
+| `esr_backtest` bootstrap, B = 499 (`r_esr_bootstrap.json`; v3 and v1 on scale-0.85, v3 on the correct set) | all p-values within 0.1, the Monte Carlo tolerance (different random streams); esback's are 0, 0.008 and 0.042 on the misspecified set |
 | `er_backtest` (B = 20,000) | one-sided p-values within 0.06 (the bootstrap is centred differently) |
 | iid sparsity | about 22% different from esreg's; ours is unbiased in simulation; not used by the backtests |
 
@@ -177,29 +179,46 @@ The `iid-t5` cells look the same (Kupiec 10.1% at n = 250, 1%, 7.3% at n = 250, 
   [3%, 7%]: Christoffersen independence (11 of 12 cells, all undersized) and conditional
   coverage at 1% with n <= 1000 (3), DQ at 1% (6, oversized at 9-11%), Kupiec at n = 250,
   1% (2), McNeil-Frey at n = 250 and at `garch-t5`, n = 1000, 1% (5, undersized) and ESR v3
-  (2). This [3%, 7%] rule is lenient: a stricter reading (interval excludes 5%) also flags
-  Kupiec at n = 250, 2.5% (7.3% in both DGPs) and at `iid-t5`, alpha = 1%, n = 1000 and 2000
-  (6.1%, 3.8%), Z1 at alpha = 1% in two cells (4.0%, 6.1%), and every McNeil-Frey cell except
-  `iid-t5`, n = 2000, 2.5%. These are properties of the
+  (2). This [3%, 7%] rule is lenient. The stricter reading (Wilson interval excludes 5%)
+  flags 55 of the 93 size cells: Christoffersen independence 12 of 12, McNeil-Frey 11 of 12
+  (all but `iid-t5`, n = 2000, 2.5%), Christoffersen conditional coverage 10 of 12 (all
+  undersized, 0.5-4.0%; only `garch-t5` and `iid-t5` at n = 2000, 2.5% cover 5%), DQ 10 of
+  12 (oversized: 9-11% at 1% and 6.0-7.9% at 2.5% for n <= 1000; only n = 2000, 2.5% covers
+  5%), Kupiec 6 of 12 (n = 250 at both levels, 7.3-10.1%, and `iid-t5`, alpha = 1%, n = 1000
+  and 2000, 6.1% and 3.8%), Z1 2 of 12 (4.0%, 6.1% at alpha = 1%), ESR v3 3 of 3, the esback
+  G2'' strict ESR variant 1 of 3 (9.0% at n = 1000, 2.5%), and none of the Z2 or strict ESR
+  (correct G2'') cells. With 93 cells about 5 would exclude 5% by chance even for exact tests,
+  so the single-cell cases (Z1, the esback variant) are weak evidence; the patterns across 10
+  or more cells are not. These are properties of the
   tests with few exceedances (the Christoffersen and DQ distortions with rare hits are
   known from the literature), not implementation failures; the closed-form checks in
   section 2 pin down the statistics themselves.
 - **Strict ESR.** Close to nominal or slightly oversized; with 200 replications the data
-  cannot distinguish 5% from 8%. The esback G2'' variant has a similar size: the
-  discrepancy changes individual p-values (section 2.2) more than the rejection rate.
+  cannot distinguish 5% from 8%. The esback G2'' variant rejects slightly more often in the
+  same replications (6.0-9.0% against 5.5-8.0%; its n = 1000 interval, 5.8-13.8%, excludes 5%
+  while the correct-G2'' interval, 5.0-12.6%, just reaches it): the discrepancy changes
+  individual p-values (section 2.2) more than the rejection rate.
 - **ESR v3** is conservative: under the null the 5% quantile of its p-value is 0.10-0.18
   and its median 0.56-0.65. A separate null study (`scripts/esr_v3_null_se.py`, 200
   replications of `garch-t5`, n = 1000, alpha = 2.5%; `results/mc-quick/esr_v3_null_se.json`)
-  shows two causes. (i) The ES intercept has a small positive finite-sample bias (mean 0.021,
-  median 0.041, against a standard deviation of 0.231), which pushes the t-statistic towards
-  "too conservative" (mean t about +0.3). (ii) The default covariance (nid sparsity,
-  `scl_sp`, misspecification terms) overstates the intercept's standard error on average
-  (mean 0.267, median 0.227, against the empirical 0.231), with a long right tail. Dropping
-  the misspecification terms gives a mean SE of 0.214 but rejects only 2.0% (t mean 0.40,
-  sd 1.23); the default rejects 1.5% in this study (0 of 200 in the Monte Carlo cell, within
-  sampling error); `scl_N` without the misspecification terms understates the SE (0.159)
-  and rejects 7%. So the misspecification terms explain part, not all, of the
-  conservativeness. `esback`'s own asymptotic v3 is just as conservative when run directly
+  shows where it comes from. The default test rejects 1.5% there (0 of 200 in the Monte
+  Carlo cell, within sampling error). The cause is the joint behaviour of the estimate and
+  its standard error, not bias or a uniformly inflated SE:
+  - The ES intercept's bias is negligible: mean 0.021 (median 0.041) against a standard
+    deviation of 0.231, i.e. 0.09 sd. A test with an oracle constant SE equal to that
+    standard deviation rejects exactly 5.0% (10 of 200), bias included.
+  - The estimated SE (default covariance: nid sparsity, `scl_sp`, misspecification terms)
+    is strongly negatively correlated with the estimate (correlation -0.49). Its mean is
+    0.334 when the estimate is negative and 0.218 when it is positive, so the t-statistic is
+    shrunk exactly in the direction that would reject (mean t -0.53 given a negative
+    estimate, +0.95 given a positive one; overall mean +0.32, sd 1.01). The SE is not
+    inflated across the board: its median (0.227) is below the empirical sd (0.231); its
+    mean (0.267) is higher only through the right tail, which sits on the negative
+    estimates.
+  - Dropping the misspecification terms lowers the SE (mean 0.214) but strengthens the
+    correlation (-0.79) and still rejects only 2.0%; `scl_N` without them understates the SE
+    (mean 0.159, correlation -0.81) and rejects 7%. Changing the covariance option trades
+    level against this asymmetry; it does not remove it. `esback`'s own asymptotic v3 is just as conservative when run directly
   on simulated null data (0 of 250), and the bootstrap restores its size; both are in
   section 3.1.
 
@@ -258,8 +277,12 @@ estimated).
   one-sided v3 test rejects 1.3%; the bootstrap rejects 4.3%, and its interval covers 5%. The
   exact bootstrap cell agrees (3.3%, 120 replications). The bootstrap 5% critical value of
   the t-statistic is about -1.06 at n = 1000 and -1.28 at n = 2000, against -1.645 for the
-  normal: the null distribution of the v3 statistic is shifted right and narrower than
-  N(0, 1), consistent with the bias and inflated standard error in section 3.
+  normal. Under the null the observed statistic T0 has roughly unit variance (sd 1.01 at
+  n = 1000, 1.00 at n = 2000) but is shifted right (mean 0.34 at n = 1000) and left-skewed:
+  its 5% quantile is -1.01 at n = 1000 and -1.20 at n = 2000, not -1.645, which is the SE
+  asymmetry of section 3. The bootstrap statistic T* is narrower (sd 0.85-0.88, mean 0.21 at
+  n = 1000) and is not a copy of T0's distribution, but its 5% quantile (-1.06 and -1.28)
+  is close to T0's, which is what the size of a one-sided test depends on.
 - **Power of v3 nearly doubles** at the corrected size: 0.65 against 0.37 (understated
   scale) and 0.35 (normal tails) for the asymptotic test, at n = 1000.
 - **Strict ESR (v1).** The asymptotic test is mildly oversized at n = 1000 (7.3%, interval
@@ -291,9 +314,11 @@ replication; the largest v1 difference is 0.057 (3 replications differ by more t
 larger than the 0.006 seen on the fixtures. Traced for the four largest differences plus
 one typical replication (`results/esback-null/trace_v1.json`): esreg's reported loss equals
 our loss at esreg's coefficients to 1e-14, and our optimum has the lower loss in all five
-(by 2e-8 to 4.5e-6, at a mean loss of about 2). The joint loss is nearly flat in the ES
-coefficients, so stopping points that differ by such tiny losses move the ES coefficients
-by up to 0.056 and the p-value by up to 0.057. Neither implementation is wrong; strict-ESR
+(by 2e-8 to 4.5e-6, at a mean loss of about 2). The joint loss is nearly flat near the
+optimum, in the quantile and ES coefficients jointly, so stopping points that differ by such
+tiny losses move the coefficients by up to 0.056 (the quantile intercept, in the replication
+with the largest p-value gap, where the quantile coefficients moved more than the ES
+coefficients), the ES coefficients by up to 0.044, and the p-value by up to 0.057. Neither implementation is wrong; strict-ESR
 p-values carry this optimisation noise of a few hundredths in rare cases.
 
 ## 4. Study results

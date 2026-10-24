@@ -58,8 +58,8 @@ packages = ["src/tailcheck"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "src/tailcheck", "tests", "docs", "configs", "scripts", "README.md", "LICENSE",
-    "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "CITATION.cff",
+    "src/tailcheck", "tests", "docs", "configs", "scripts", "examples", "README.md",
+    "REPORT.md", "LICENSE", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "CITATION.cff",
 ]
 exclude = ["scripts/r_fixtures/node_modules"]
 

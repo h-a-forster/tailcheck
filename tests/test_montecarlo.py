@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -86,7 +87,8 @@ def test_runner_and_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     units = build_units(load_config(cfg))
     assert sum(1 for u, _ in units if u.startswith("esr|")) == 1
     assert sum(1 for u, _ in units if u.startswith("cheap|")) == 3  # 2 size chunks + 1 power
-    run_mc(cfg, workers=1)
+    res = run_mc(cfg, workers=1)
+    assert res.complete and (res.done, res.expected, res.failed) == (4, 4, 0)
     df = collect_mc(cfg)
     assert set(df["test"]) >= {"kupiec", "as_z2", "esr_v1", "esr_v3", "esr_v1_esback_g2pp"}
     k = df[(df["test"] == "kupiec") & (df["dgp"] == "iid-t5")].iloc[0]
@@ -96,6 +98,19 @@ def test_runner_and_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     out = pd.read_csv(tmp_path / "results" / "mc-test" / "size_power.csv")
     assert len(out) == len(df)
     assert (tmp_path / "results" / "mc-test" / "size_power.md").exists()
+    summary = tmp_path / "results" / "mc-test" / "summary.json"
+    assert json.loads(summary.read_text())["complete"] is True
+    # a partial run (unit missing) is refused unless allowed, and then marked incomplete
+    from tailcheck.checkpoint import IncompleteRunError, store_for
+
+    store_for(load_config(cfg)).path(units[-1][0]).unlink()
+    with pytest.raises(IncompleteRunError, match="3/4 units done"):
+        write_mc_report(cfg)
+    write_mc_report(cfg, allow_partial=True)
+    s = json.loads(summary.read_text())
+    assert (s["complete"], s["expected"], s["done"]) == (False, 4, 3)
+    md = (tmp_path / "results" / "mc-test" / "size_power.md").read_text()
+    assert md.startswith("**INCOMPLETE RUN: 3 of 4 units done.**")
 
 
 def test_as_null_seed_differs_per_chunk(tmp_path: Path) -> None:

@@ -19,7 +19,14 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from tailcheck.checkpoint import UnitStore, _atomic_write_bytes, config_hash, run_units, safe_id
+from tailcheck.checkpoint import (
+    RunResult,
+    _atomic_write_bytes,
+    completeness,
+    run_units,
+    safe_id,
+    store_for,
+)
 from tailcheck.data import load_returns, series_sha256
 
 REGIMES = ("full", "calm", "turbulent")
@@ -333,21 +340,38 @@ def configured_workers(cfg: Mapping[str, Any], workers: int | None) -> int:
     return int(workers if workers is not None else cfg.get("run", {}).get("workers", 4))
 
 
+def study_unit_ids(cfg: Mapping[str, Any]) -> list[str]:
+    """Every unit id of a finished study run (all stages, the full configured grid)."""
+    assets = [a["id"] for a in cfg["data"]["assets"]]
+    models = list(cfg["forecast"]["models"])
+    alphas = [float(a) for a in cfg["forecast"]["alphas"]]
+    ids = [f"forecast__{a}__{m}" for a in assets for m in models]
+    ids += [f"backtest__{a}__{m}__{x}" for a in assets for m in models for x in alphas]
+    if len(models) >= 2:
+        ids += [f"compare__{a}__{x}" for a in assets for x in alphas]
+    return ids
+
+
 def run_study(
     cfg_path: Path,
     workers: int | None = None,
     force_new: bool = False,
     stages: tuple[str, ...] = ("forecast", "backtest", "compare"),
-) -> Path:
-    """Run (or resume) all stages; returns the run directory."""
+) -> RunResult:
+    """Run (or resume) the given stages; returns the run directory and its completeness.
+
+    ``RunResult.complete`` refers to the whole study grid, so a run limited to some stages
+    reports itself incomplete until the remaining stages are run.
+    """
     cfg = load_config(cfg_path)
     out_dir = Path(cfg["run"]["out_dir"])
     unknown = set(stages) - set(STAGES)
     if unknown:
         raise ValueError(f"unknown stage(s) {sorted(unknown)}; choose from {list(STAGES)}")
     workers = configured_workers(cfg, workers)
-    store = UnitStore(out_dir, config_hash(cfg), force_new=force_new, inputs=study_inputs(cfg))
+    store = store_for(cfg, force_new=force_new, inputs=study_inputs(cfg))
     gseed = int(cfg["seed"])
+    failed = 0
     assets = [a["id"] for a in cfg["data"]["assets"]]
     models = list(cfg["forecast"]["models"])
     alphas = [float(a) for a in cfg["forecast"]["alphas"]]
@@ -374,7 +398,7 @@ def run_study(
                 )
         # CAViaR units are the slowest; start them first for better packing
         units.sort(key=lambda u: u[1]["model"] != "caviar-sav")
-        run_units(store, units, forecast_unit, workers=workers, on_error="log")
+        failed += run_units(store, units, forecast_unit, workers=workers, on_error="log")["failed"]
     if "backtest" in stages:
         units = []
         for asset in assets:
@@ -397,7 +421,7 @@ def run_study(
                             },
                         )
                     )
-        run_units(store, units, backtest_unit, workers=workers, on_error="log")
+        failed += run_units(store, units, backtest_unit, workers=workers, on_error="log")["failed"]
     if "compare" in stages:
         units = []
         for asset in assets:
@@ -428,5 +452,6 @@ def run_study(
                         },
                     )
                 )
-        run_units(store, units, compare_unit, workers=workers, on_error="log")
-    return out_dir
+        failed += run_units(store, units, compare_unit, workers=workers, on_error="log")["failed"]
+    st = completeness(store, study_unit_ids(cfg))
+    return RunResult(out_dir, st["expected"], st["done"], failed)

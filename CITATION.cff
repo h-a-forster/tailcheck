@@ -2,8 +2,9 @@ cff-version: 1.2.0
 message: "If you use tailcheck, please cite it as below."
 title: tailcheck
 abstract: >-
-  VaR and Expected Shortfall backtests in Python, including a port of the
-  Bayer-Dimitriadis ES regression backtests, FZ0 scoring and model confidence
+  VaR and Expected Shortfall backtests in Python, including an implementation
+  (from the papers) of the Bayer-Dimitriadis ES regression backtests, FZ0
+  scoring and model confidence
   sets, with Monte Carlo checks of size and power for every test.
 type: software
 authors:

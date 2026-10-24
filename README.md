@@ -31,7 +31,9 @@ Acerbi-Szekely tests (searched 2026-10-23).
   webR): quantile regression agrees to 1e-14; our joint-regression loss is never above R's;
   the sandwich covariance agrees to 4e-6 (`scl_N`) and 0.4% (`scl_sp`) at R's coefficients;
   all 36 `esr_backtest` p-values agree within 0.006 once one discrepancy in `esreg` is
-  reproduced (next point).
+  reproduced (next point). The test suite enforces these with some margin (1e-10, 1e-5 and
+  1%, 0.01). The bootstrap ESR p-values are checked against hand-built resamples with known
+  statistics and, distributionally, against `esback`'s bootstrap on a fixture.
 - **A discrepancy in `esreg` 0.6.2.** Its second derivative of the default G2 function
   returns `-1/z^3` instead of `-2/z^3`. The term enters the misspecification-robust
   covariance used by `esback`'s default ESR tests and moved strict-ESR p-values by up to
@@ -41,8 +43,9 @@ Acerbi-Szekely tests (searched 2026-10-23).
   sample sizes used in practice, with Wilson intervals. See [REPORT.md](REPORT.md).
 - **ESR v3: use the bootstrap.** The asymptotic one-sided intercept test (v3) is
   conservative, in tailcheck and in `esback` alike (about 0-2% rejections at 5% under the
-  null; `esback` 0 of 250). With `n_boot > 0` the bootstrap p-value rejected 4.3% of 1,000
-  null samples and had nearly twice the power (REPORT section 3.1). It costs about 0.3-0.5 s
+  null; `esback` 0 of 250). With `n_boot > 0` the bootstrap test's size was estimated at
+  4.3% (warp-speed Monte Carlo over 1,000 null samples; the full B = 99 bootstrap on 120
+  samples rejected 3.3%), with nearly twice the power (REPORT section 3.1). It costs about 0.3-0.5 s
   per resample at n = 1000-2000.
 
 ## Install

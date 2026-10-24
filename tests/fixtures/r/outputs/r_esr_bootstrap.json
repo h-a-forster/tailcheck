@@ -1,0 +1,35 @@
+{
+  "B": 499,
+  "cases": [
+    {
+      "set": "scale",
+      "alpha": 0.025,
+      "version": 3,
+      "pvalue_twosided_asymptotic": 0.0155808812218969,
+      "pvalue_twosided_bootstrap": 0.00801603206412826,
+      "pvalue_onesided_asymptotic": 0.0077904406109485,
+      "pvalue_onesided_bootstrap": 0
+    },
+    {
+      "set": "scale",
+      "alpha": 0.025,
+      "version": 1,
+      "pvalue_twosided_asymptotic": 0.0491240784321475,
+      "pvalue_twosided_bootstrap": 0.0420841683366733
+    },
+    {
+      "set": "true",
+      "alpha": 0.025,
+      "version": 3,
+      "pvalue_twosided_asymptotic": 0.981633246642663,
+      "pvalue_twosided_bootstrap": 0.977955911823647,
+      "pvalue_onesided_asymptotic": 0.509183376678668,
+      "pvalue_onesided_bootstrap": 0.470941883767535
+    }
+  ],
+  "versions": {
+    "R": "R version 4.6.0 (2026-04-24)",
+    "esreg": "0.6.2",
+    "esback": "0.3.1"
+  }
+}

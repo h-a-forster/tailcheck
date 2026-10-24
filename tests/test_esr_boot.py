@@ -156,3 +156,61 @@ def test_run_units_time_budget_pool(tmp_path: Path) -> None:
     assert stats["stopped"] == 1
     assert stats["ran"] < 12  # queued units were cancelled
     assert sum(store.done(u) for u, _ in units) == stats["ran"]
+
+
+# --- the ESR bootstrap on hand-built resamples with known statistics ---------------------
+
+
+def _scripted_bootstrap(
+    monkeypatch: pytest.MonkeyPatch, version: int, full: list[float], boots: list[tuple]
+) -> dict[str, object]:
+    """Run ``_bootstrap`` where resample ``i`` "fits" ``boots[i] = (coef_e, cov_e diag)``."""
+    from types import SimpleNamespace
+
+    from tailcheck import esr_backtest as eb
+
+    it = iter(boots)
+
+    def fake_fit(*args: object) -> SimpleNamespace:
+        coef, var = next(it)
+        return SimpleNamespace(coef_e=np.asarray(coef, float), var=np.asarray(var, float))
+
+    def fake_vcov(fb: SimpleNamespace, *args: object) -> tuple[np.ndarray, dict]:
+        cov = np.diag(np.concatenate([[9.0, 9.0], fb.var]))  # quantile block is ignored
+        return cov, {}
+
+    monkeypatch.setattr(eb, "_fit", fake_fit)
+    monkeypatch.setattr(eb, "vcov_details", fake_vcov)
+    y = np.zeros(10)
+    fit = SimpleNamespace(coef_e=np.asarray(full, float))
+    stat0 = -0.6 if version == 3 else 2.5
+    return eb._bootstrap(
+        version, y, y[:, None], None, 0.025, fit, stat0, len(boots), 1, "nid", "scl_sp", True
+    )
+
+
+def test_bootstrap_v3_centred_at_estimate_lower_tail(monkeypatch: pytest.MonkeyPatch) -> None:
+    # full-sample b0 = 0.5; resamples give T* = (b0* - 0.5) / se* = -3, -0.5, 0, 2, 1
+    boots = [([0.2], [0.01]), ([0.4], [0.04]), ([0.5], [0.25]), ([0.7], [0.01]), ([0.9], [0.16])]
+    out = _scripted_bootstrap(monkeypatch, 3, [0.5], boots)
+    # one-sided (lower tail): T* <= -0.6 only for -3 -> (1 + 1) / (5 + 1)
+    assert out["pvalue_bootstrap"] == pytest.approx(2 / 6)
+    # two-sided: |T*| >= 0.6 for -3, 2, 1 -> (1 + 3) / 6
+    assert out["pvalue_bootstrap_two_sided"] == pytest.approx(4 / 6)
+    # centring at 0 instead of 0.5 would give T* = 2, 2, 1, 7, 2.25 and p = 1/6;
+    # the upper tail would give (1 + 4) / 6
+    assert out["n_boot_failed"] == 0
+
+
+def test_bootstrap_v1_wald_uses_resample_covariance(monkeypatch: pytest.MonkeyPatch) -> None:
+    full = [0.5, 1.0]
+    # d = coef* - full; ce* = diag(var*); T* = sum(d^2 / var*) = 1, 4, 9, 0.25
+    boots = [
+        ([0.6, 1.0], [0.01, 1.0]),
+        ([0.5, 1.2], [1.0, 0.01]),
+        ([0.2, 1.0], [0.01, 1.0]),
+        ([0.5, 0.5], [1.0, 1.0]),
+    ]
+    out = _scripted_bootstrap(monkeypatch, 1, full, boots)
+    # upper tail: T* >= 2.5 for 4 and 9 -> (1 + 2) / (4 + 1)
+    assert out["pvalue_bootstrap"] == pytest.approx(3 / 5)

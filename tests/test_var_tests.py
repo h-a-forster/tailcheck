@@ -113,6 +113,15 @@ def test_christoffersen_no_hits_and_single_hit_at_end() -> None:
     assert all_hits.statistic == pytest.approx(0.0, abs=1e-12)
 
 
+def test_christoffersen_single_hit_on_first_day_reason() -> None:
+    h = np.zeros(100)
+    h[0] = 1
+    res = christoffersen_independence(*_from_hits(h), 0.01)
+    assert res.statistic == 0.0 and res.pvalue == 1.0
+    assert res.details["hits"] == 1
+    assert res.details["reason"] == "no transitions into a hit"
+
+
 def test_var_tests_depend_only_on_hits() -> None:
     rng = np.random.default_rng(0)
     r = rng.standard_normal(300)

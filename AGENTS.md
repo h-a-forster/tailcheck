@@ -97,9 +97,13 @@ Full size: `configs/study_full.toml` (daily refits, bootstrap ESR; projected 20-
 CPU-hours) and `configs/mc_full.toml` (projected 35-45 CPU-hours); projections, not
 measurements (see the config headers). Both resume from `runs/<name>/units/`. A run directory
 refuses to resume when the config, the processed data or the package version changed (use
-`--force-new` or a new `out_dir`); changed code only warns. Reports are read-only and fail
-cleanly without a finished run. Before a
-long run, validate on a small sample, wrap it in a resume-on-failure loop, and watch
+`--force-new` or a new `out_dir`; `--force-new` deletes every finished unit); changed code
+only warns, and `[run] workers` is not part of the config hash (or use `--workers`). A run
+command exits 0 only when every configured unit is done; it exits 3 when the session stopped
+at `--max-minutes` or left failed units (rerun to resume), and 2 on errors. Reports are
+read-only; they fail cleanly without a run and refuse a partial run unless
+`--allow-partial` (outputs then say `complete: false`). Before a long run, validate on a
+small sample, wrap it in a resume-on-failure loop keyed on exit code 3, and watch
 `runs/<name>/progress.log` for stalls.
 
 ## Status and next steps
@@ -143,8 +147,10 @@ Done:
 - M8: `montecarlo` (DGPs, runner per (cell, chunk), report with Wilson intervals). Quick
   run (regenerated at `d6a4d86`): 231 cells, 296,280 replications, 11.6 min wall / 45.4
   CPU-min, 0 failures; results in `results/mc-quick/`. ESR v3 asymptotic is conservative
-  (0-1% at 5%; cause analysed with `scripts/esr_v3_null_se.py`); Christoffersen ind
-  undersized; DQ oversized at 1%; McNeil-Frey below 5% everywhere.
+  (0-1% at 5%; `scripts/esr_v3_null_se.py`: the intercept SE is negatively correlated with
+  the estimate, corr -0.49; bias 0.09 sd; oracle-SE test 5.0%); Christoffersen ind
+  undersized; DQ oversized at 1% and at 2.5% for n <= 1000; McNeil-Frey below 5% almost
+  everywhere. 55 of 93 size cells have a Wilson interval excluding 5% (REPORT 3).
 - Study quick run (regenerated at `d6a4d86`): 50 cells, 4.4 min wall / 15.9 CPU-min, 0
   failures; results in `results/study-v1/`. Strict ESR rejections 11 raw / 6 BH / 4 Holm
   (all too conservative).
@@ -177,6 +183,17 @@ Done:
     loaded machine: mc_full 145 CPU-hours as measured, study_full 59; a reference fit was
     1.4-2.6x slower than on a quieter machine, so roughly 55-105 and 23-42 idle. The 0.1.0
     projections (35-45, 20-30) were too low for mc_full. Re-time on an idle machine.
+
+- Round 3 (2026-10-24), second audit fixed: partial runs looked finished (run commands
+  now print done/expected and exit 3 when incomplete; reports refuse partial runs unless
+  `--allow-partial` and record `complete`); `[run] workers` no longer in the config hash
+  (old-hash runs still resume); sdist ships `examples/` and `REPORT.md`; Christoffersen
+  single-hit-on-day-0 reason; ESR bootstrap now tested on hand-built resamples (catches
+  centring/tail errors) and distributionally against an `esback` B = 499 fixture
+  (`scripts/r_fixtures/esr_boot_fixture.R`); R-fixture tolerances tightened; REPORT
+  corrected (ESR v3 cause is the estimate/SE correlation, not bias; T0 vs T* shape;
+  complete list of cells excluding 5%; trace coefficient differences); README bootstrap
+  size wording; CITATION "implementation", not "port".
 
 Next (not done):
 - Full-size profiles (`configs/study_full.toml`, `configs/mc_full.toml`); see the re-timing

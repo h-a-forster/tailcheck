@@ -10,7 +10,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from tailcheck.checkpoint import UnitStore, config_hash
+from tailcheck.checkpoint import (
+    completeness,
+    config_hash,
+    partial_banner,
+    require_complete,
+    store_for,
+)
 from tailcheck.study.runner import load_config
 
 
@@ -59,7 +65,7 @@ def collect_mc(cfg_path: Path) -> pd.DataFrame:
     cfg = load_config(cfg_path)
     level = float(cfg.get("level", 0.05))
     band = distortion_band(level)
-    store = UnitStore(Path(cfg["run"]["out_dir"]), config_hash(cfg), read_only=True)
+    store = store_for(cfg, read_only=True)
     size_dgps = set(cfg["cheap"]["dgps_size"]) | set(cfg["esr"]["dgps_size"])
     pooled: dict[tuple[str, str, int, float], dict[str, Any]] = {}
     for uid in store.completed():
@@ -106,7 +112,7 @@ def collect_mc(cfg_path: Path) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def write_mc_report(cfg_path: Path) -> str:
+def write_mc_report(cfg_path: Path, allow_partial: bool = False) -> str:
     cfg = load_config(cfg_path)
     level = float(cfg.get("level", 0.05))
     lo_band, hi_band = distortion_band(level)
@@ -116,10 +122,17 @@ def write_mc_report(cfg_path: Path) -> str:
             f"no completed Monte Carlo units in {cfg['run']['out_dir']}; "
             "run `tailcheck mc run` first (nothing was written)"
         )
+    from tailcheck.montecarlo.runner import build_units
+
+    status = completeness(
+        store_for(cfg, read_only=True),
+        [u for u, _ in build_units(cfg)],
+    )
+    require_complete(status, allow_partial, "tailcheck mc run")
     out = Path("results") / cfg["name"]
     out.mkdir(parents=True, exist_ok=True)
     df.to_csv(out / "size_power.csv", index=False, float_format="%.6g")
-    lines = []
+    lines = [] if status["complete"] else [partial_banner(status), ""]
     for kind in ("size", "power"):
         sub = df[df["kind"] == kind]
         if not len(sub):
@@ -162,6 +175,7 @@ def write_mc_report(cfg_path: Path) -> str:
     )
     (out / "size_power.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     summary = {
+        **{k: status[k] for k in ("complete", "expected", "done")},
         "cells": len(df),
         "total_replications": int(df["reps"].sum()),
         "distorted_size_cells": df.loc[

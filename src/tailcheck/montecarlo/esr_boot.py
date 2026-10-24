@@ -26,7 +26,15 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from tailcheck.checkpoint import UnitStore, config_hash, run_units
+from tailcheck.checkpoint import (
+    RunResult,
+    completeness,
+    config_hash,
+    partial_banner,
+    require_complete,
+    run_units,
+    store_for,
+)
 from tailcheck.montecarlo.dgp import SIZE_DGPS, simulate
 from tailcheck.montecarlo.report import wilson
 from tailcheck.study.runner import configured_workers, load_config, unit_seed
@@ -137,23 +145,23 @@ def run_boot_mc(
     workers: int | None = None,
     force_new: bool = False,
     max_minutes: float | None = None,
-) -> Path:
+) -> RunResult:
     from tailcheck import __version__
 
     cfg = load_config(cfg_path)
     out_dir = Path(cfg["run"]["out_dir"])
-    store = UnitStore(
-        out_dir, config_hash(cfg), force_new=force_new, inputs={"tailcheck": __version__}
-    )
-    run_units(
+    store = store_for(cfg, force_new=force_new, inputs={"tailcheck": __version__})
+    units = build_boot_units(cfg)
+    stats = run_units(
         store,
-        build_boot_units(cfg),
+        units,
         boot_unit,
         configured_workers(cfg, workers),
         on_error="log",
         max_seconds=None if max_minutes is None else 60.0 * max_minutes,
     )
-    return out_dir
+    st = completeness(store, [u for u, _ in units])
+    return RunResult(out_dir, st["expected"], st["done"], stats["failed"], bool(stats["stopped"]))
 
 
 def warp_rate(
@@ -203,7 +211,7 @@ def warp_interval(
 def collect_boot(cfg_path: Path) -> pd.DataFrame:
     cfg = load_config(cfg_path)
     level = float(cfg.get("level", 0.05))
-    store = UnitStore(Path(cfg["run"]["out_dir"]), config_hash(cfg), read_only=True)
+    store = store_for(cfg, read_only=True)
     pooled: dict[tuple[str, str, str, int, float], dict[str, Any]] = {}
     for uid in store.completed():
         d = store.read(uid)
@@ -267,7 +275,7 @@ def collect_boot(cfg_path: Path) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def write_boot_report(cfg_path: Path) -> str:
+def write_boot_report(cfg_path: Path, allow_partial: bool = False) -> str:
     cfg = load_config(cfg_path)
     level = float(cfg.get("level", 0.05))
     df = collect_boot(cfg_path)
@@ -275,10 +283,16 @@ def write_boot_report(cfg_path: Path) -> str:
         raise ValueError(
             f"no completed units in {cfg['run']['out_dir']}; run `tailcheck mc boot-run` first"
         )
+    status = completeness(
+        store_for(cfg, read_only=True),
+        [u for u, _ in build_boot_units(cfg)],
+    )
+    require_complete(status, allow_partial, "tailcheck mc boot-run")
     out = Path("results") / cfg["name"]
     out.mkdir(parents=True, exist_ok=True)
     df.to_csv(out / "size_power.csv", index=False, float_format="%.6g")
-    lines = [
+    lines = [] if status["complete"] else [partial_banner(status), ""]
+    lines += [
         f"Rejection rates at {100 * level:g}% with 95% intervals (asymptotic: Wilson; "
         "bootstrap: Wilson for `exact`, joint resampling of replications for `warp`).",
         "",
@@ -297,6 +311,7 @@ def write_boot_report(cfg_path: Path) -> str:
         )
     (out / "size_power.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     summary: dict[str, Any] = {
+        **{k: status[k] for k in ("complete", "expected", "done")},
         "cells": len(df),
         "replications": int(df.groupby(["mode", "dgp", "n", "alpha"])["reps"].max().sum()),
         "config_hash": config_hash(cfg),

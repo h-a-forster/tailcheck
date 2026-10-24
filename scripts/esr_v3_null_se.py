@@ -10,6 +10,9 @@ error under three covariance options:
 - ``no_misspec``: the same without the misspecification terms;
 - ``scl_N_no_misspec``: normal-scale ``scl_N`` variance, no misspecification terms.
 
+Also records the correlation between ``b0`` and its SE, the mean SE and t given the sign of
+``b0``, and the size of an oracle test with a constant SE equal to the empirical sd.
+
 Writes ``results/mc-quick/esr_v3_null_se.json``. About 3 minutes with 3 processes.
 
     uv run python scripts/esr_v3_null_se.py
@@ -25,6 +28,7 @@ from pathlib import Path
 import numpy as np
 
 SEED, N, ALPHA, REPS, WORKERS = 20261023, 1000, 0.025, 200, 3
+Z05 = -1.6448536269514722
 OPTIONS = {
     "default": ("nid", "scl_sp", True),
     "no_misspec": ("nid", "scl_sp", False),
@@ -62,6 +66,9 @@ def main() -> None:
         "b0_mean": float(b.mean()),
         "b0_median": float(np.median(b)),
         "b0_sd": float(b.std(ddof=1)),
+        "b0_bias_in_sd": float(b.mean() / b.std(ddof=1)),
+        # Oracle test: constant SE equal to the empirical sd of b0 (bias included).
+        "oracle_se_reject_5pct_one_sided": float(np.mean(b / b.std(ddof=1) < Z05)),
     }
     for name in OPTIONS:
         se = np.array([r[name] for r in rows])
@@ -71,7 +78,12 @@ def main() -> None:
             "se_median": float(np.median(se)),
             "t_mean": float(t.mean()),
             "t_sd": float(t.std(ddof=1)),
-            "reject_5pct_one_sided": float(np.mean(t < -1.6448536269514722)),
+            "reject_5pct_one_sided": float(np.mean(t < Z05)),
+            "corr_b0_se": float(np.corrcoef(b, se)[0, 1]),
+            "se_mean_given_b0_neg": float(se[b < 0].mean()),
+            "se_mean_given_b0_pos": float(se[b > 0].mean()),
+            "t_mean_given_b0_neg": float(t[b < 0].mean()),
+            "t_mean_given_b0_pos": float(t[b > 0].mean()),
         }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8", newline="\n")

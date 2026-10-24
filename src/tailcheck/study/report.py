@@ -11,9 +11,15 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from tailcheck.checkpoint import UnitStore, config_hash
+from tailcheck.checkpoint import (
+    completeness,
+    config_hash,
+    partial_banner,
+    require_complete,
+    store_for,
+)
 from tailcheck.multiple import benjamini_hochberg, holm
-from tailcheck.study.runner import load_config
+from tailcheck.study.runner import load_config, study_unit_ids
 
 
 def _p(d: dict[str, Any] | None, key: str = "pvalue") -> float:
@@ -25,7 +31,7 @@ def _p(d: dict[str, Any] | None, key: str = "pvalue") -> float:
 
 def collect_study(cfg_path: Path) -> dict[str, pd.DataFrame]:
     cfg = load_config(cfg_path)
-    store = UnitStore(Path(cfg["run"]["out_dir"]), config_hash(cfg), read_only=True)
+    store = store_for(cfg, read_only=True)
     classes = {a["id"]: a.get("class", "") for a in cfg["data"]["assets"]}
     rows, regimes, compares, forecasts = [], [], [], []
     for uid in store.completed():
@@ -128,8 +134,12 @@ def _md(df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def write_study_report(cfg_path: Path) -> str:
-    """Write ``results/<name>/`` CSVs, ``summary.json`` and ``tables.md``; return a summary."""
+def write_study_report(cfg_path: Path, allow_partial: bool = False) -> str:
+    """Write ``results/<name>/`` CSVs, ``summary.json`` and ``tables.md``; return a summary.
+
+    Refuses a partial run (Holm/BH over a subset of the cells would be too lenient) unless
+    ``allow_partial``, in which case the outputs are marked incomplete.
+    """
     cfg = load_config(cfg_path)
     t = collect_study(cfg_path)  # read-only; raises if the run directory is missing
     if not len(t["backtests"]):
@@ -137,12 +147,17 @@ def write_study_report(cfg_path: Path) -> str:
             f"no completed backtest units in {cfg['run']['out_dir']}; "
             "run `tailcheck study run` first (nothing was written)"
         )
+    status = completeness(
+        store_for(cfg, read_only=True),
+        study_unit_ids(cfg),
+    )
+    require_complete(status, allow_partial, "tailcheck study run")
     out = Path("results") / cfg["name"]
     out.mkdir(parents=True, exist_ok=True)
     for name, df in t.items():
         df.to_csv(out / f"{name}.csv", index=False, float_format="%.6g")
     bt, rg, cp = t["backtests"], t["regimes"], t["compare"]
-    md: list[str] = []
+    md: list[str] = [] if status["complete"] else [partial_banner(status) + "\n"]
     for alpha in sorted(bt["alpha"].unique()):
         sub = bt[bt["alpha"] == alpha]
         md.append(f"### Strict ESR (v1) p-values, alpha = {alpha} (BH q in brackets)\n")
@@ -204,6 +219,7 @@ def write_study_report(cfg_path: Path) -> str:
         "config": str(cfg_path),
         "config_hash": config_hash(cfg),
         "seed": cfg["seed"],
+        **{k: status[k] for k in ("complete", "expected", "done")},
         "n_backtest_cells": len(bt),
         "esr_v1_rejections_5pct": {"raw": n_rej_raw, "holm": n_rej_holm, "bh": n_rej_bh},
         "esr_v1_undefined": int(bt["esr_v1_p"].isna().sum()),

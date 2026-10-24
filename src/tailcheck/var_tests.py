@@ -92,8 +92,11 @@ def christoffersen_independence(r: ArrayLike, q: ArrayLike, alpha: float) -> Bac
         "n11": counts[3],
         "hits": int(h.sum()),
     }
-    if counts[1] + counts[3] == 0:
+    if details["hits"] == 0:
         details["reason"] = "no exceedances"
+    elif counts[1] + counts[3] == 0:
+        # a single hit on the first day: no transition into a hit can be observed
+        details["reason"] = "no transitions into a hit"
     return BacktestResult(
         test="christoffersen_ind",
         statistic=lr,

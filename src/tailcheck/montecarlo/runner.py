@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from tailcheck.checkpoint import UnitStore, config_hash, run_units
+from tailcheck.checkpoint import RunResult, completeness, run_units, store_for
 from tailcheck.montecarlo.dgp import as_null, simulate
 from tailcheck.study.runner import configured_workers, load_config, unit_seed
 
@@ -218,15 +218,15 @@ def _dispatch(arg: dict[str, Any]) -> dict[str, object]:
     return esr_unit(arg) if "versions" in arg else cheap_unit(arg)
 
 
-def run_mc(cfg_path: Path, workers: int | None = None, force_new: bool = False) -> Path:
+def run_mc(cfg_path: Path, workers: int | None = None, force_new: bool = False) -> RunResult:
     from tailcheck import __version__
 
     cfg = load_config(cfg_path)
     out_dir = Path(cfg["run"]["out_dir"])
-    store = UnitStore(
-        out_dir, config_hash(cfg), force_new=force_new, inputs={"tailcheck": __version__}
+    store = store_for(cfg, force_new=force_new, inputs={"tailcheck": __version__})
+    units = build_units(cfg)
+    stats = run_units(
+        store, units, _dispatch, workers=configured_workers(cfg, workers), on_error="log"
     )
-    run_units(
-        store, build_units(cfg), _dispatch, workers=configured_workers(cfg, workers), on_error="log"
-    )
-    return out_dir
+    st = completeness(store, [u for u, _ in units])
+    return RunResult(out_dir, st["expected"], st["done"], stats["failed"], bool(stats["stopped"]))
