@@ -108,7 +108,7 @@ small sample, wrap it in a resume-on-failure loop keyed on exit code 3, and watc
 
 ## Status and next steps
 
-Updated: 2026-10-24.
+Updated: 2026-10-30.
 
 Done:
 - Scaffold, `docs/DESIGN.md`, research checks (FRED instead of Stooq; Binance ms->us
@@ -162,7 +162,7 @@ Done:
   ignored config keys removed, README tolerance claims, REPORT wording (Kupiec/MF size,
   ESR v3 cause, FZ0 objective change in `d097f0f`). Each fix has a test.
 - M9/M10: `REPORT.md`, README (install, quick start, CLI example), CHANGELOG 0.1.0
-  (version bumped, not tagged), DESIGN section 12 (implementation notes).
+  (version bumped), DESIGN section 12 (implementation notes).
 - Tests: see the latest commit message for counts (`uv run pytest`; `--runslow` also
   runs the slow Monte Carlo and R-fixture checks; 2 documented skips: iid sparsity vs
   esreg).
@@ -195,11 +195,19 @@ Done:
   complete list of cells excluding 5%; trace coefficient differences); README bootstrap
   size wording; CITATION "implementation", not "port".
 
+- Release prep (2026-10-30): CHANGELOG 0.1.0 dated 2026-10-30 (Unreleased folded in),
+  `docs/release-notes-0.1.0.md`; README per-resample cost corrected to the measured
+  0.8-1.6 s (`results/retime-full.json`); esreg repro re-run (still 0.125 on 0.6.2, the
+  current CRAN release and GitHub `main`); upstream issue drafted in
+  `docs/upstream/esreg-g2pp.md` (not filed).
+
 Next (not done):
 - Full-size profiles (`configs/study_full.toml`, `configs/mc_full.toml`); see the re-timing
   above for the cost. Run on an otherwise idle machine and re-time first.
 - Bootstrap ESR at alpha = 1% and on `iid-t5`; bootstrap p-values in the study (the quick
   study's v3 column is conservative, REPORT 3.1). Full-size boot profile: warp reps x 5, exact
   cell 300 reps with n_boot = 199 (about 25 CPU-hours, see the config header).
-- Tagging v0.1.0 and publishing (needs the owner's go-ahead). Re-running anything: resume
-from `runs/<name>/units/`; delete a run directory only to start over.
+- Tag v0.1.0 and file the esreg issue (`docs/upstream/esreg-g2pp.md`); both need the
+  owner's go-ahead.
+- Re-running anything: resume from `runs/<name>/units/`; delete a run directory only to
+  start over.

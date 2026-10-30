@@ -5,53 +5,9 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Added
+## [0.1.0] - 2026-10-30
 
-- `tailcheck.montecarlo.esr_boot` and `tailcheck mc boot-run | boot-report`: size and power
-  of the bootstrap ESR tests, by the warp-speed method (one resample per replication) and
-  by the full bootstrap, paired with the asymptotic p-values of the same replications.
-  Config `configs/mc_esr_boot.toml`; results in `results/mc-esr-boot/`.
-- `run_units(max_seconds=...)` and `--max-minutes` on `mc boot-run`: stop starting units
-  after a time budget; a rerun resumes.
-- Monte Carlo report: chunk-clustered intervals (`lo_chunk`, `hi_chunk`) and the design
-  effect per cell in `size_power.csv`.
-- `scripts/esback_null/`: `esback`'s asymptotic ESR tests on simulated null data through
-  webR, next to tailcheck on the same samples (`results/esback-null/`).
-- `scripts/retime_full.py`: re-times samples of the full-size profiles
-  (`results/retime-full.json`).
-
-### Changed
-
-- Run sessions (`study run`, `mc run`, `mc boot-run`) print units done/expected, failures
-  and whether they stopped at the time budget, and exit with code 3 when the run is
-  incomplete. The Python functions return `RunResult` instead of the run directory.
-- Reports (`study report`, `mc report`, `mc boot-report`) refuse a partial run unless
-  `--allow-partial`; `summary.json` now records `complete`, `expected` and `done`.
-- The run config hash ignores `[run] workers`; runs started under the old hash still resume.
-  Hashes quoted in REPORT.md and the committed `summary.json` files are the old
-  whole-config hashes; a regenerated report prints the new one.
-- The sdist now includes `examples/` (used by the CLI test and the quick start) and
-  `REPORT.md`.
-- Tighter R-fixture tolerances (quantile regression 1e-10, covariance 1e-5 / 1%, ESR
-  p-values 0.01, `bw.SJ` 1%).
-
-### Fixed
-
-- `christoffersen_independence`: a single hit on the first day no longer reports
-  `reason = "no exceedances"`; it reports `"no transitions into a hit"`.
-
-### Findings
-
-- The asymptotic ESR v3 test is conservative because the ES-intercept standard error is
-  negatively correlated with the estimate (about -0.5), not because of bias (0.09 sd) or a
-  uniformly inflated SE; an oracle-SE test has correct size (REPORT section 3).
-- The bootstrap restores the size of the one-sided ESR v3 test (4.3% at 5%, against 1.3%
-  asymptotically) and nearly doubles its power; `esback`'s asymptotic v3 is equally
-  conservative (0 of 250 null samples). See REPORT section 3.1.
-
-## [0.1.0] - unreleased
-
-First feature-complete version. Not tagged and not on PyPI.
+First release. Not on PyPI; install from GitHub.
 
 ### Added
 
@@ -81,8 +37,35 @@ First feature-complete version. Not tagged and not on PyPI.
 - R reference fixtures from `esreg` 0.6.2, `esback` 0.3.1 and `quantreg` 6.1 generated with
   webR (`scripts/r_fixtures/`), committed as JSON; the tests never need R.
 - `REPORT.md` with the quick-profile study and Monte Carlo results.
+- `tailcheck.montecarlo.esr_boot` and `tailcheck mc boot-run | boot-report`: size and power
+  of the bootstrap ESR tests, by the warp-speed method (one resample per replication) and
+  by the full bootstrap, paired with the asymptotic p-values of the same replications.
+  Config `configs/mc_esr_boot.toml`; results in `results/mc-esr-boot/`.
+- `run_units(max_seconds=...)` and `--max-minutes` on `mc boot-run`: stop starting units
+  after a time budget; a rerun resumes.
+- Monte Carlo report: chunk-clustered intervals (`lo_chunk`, `hi_chunk`) and the design
+  effect per cell in `size_power.csv`.
+- `scripts/esback_null/`: `esback`'s asymptotic ESR tests on simulated null data through
+  webR, next to tailcheck on the same samples (`results/esback-null/`).
+- `scripts/retime_full.py`: re-times samples of the full-size profiles
+  (`results/retime-full.json`).
 
-### Fixed (pre-release audit)
+### Changed (during the pre-release audits)
+
+- Run sessions (`study run`, `mc run`, `mc boot-run`) print units done/expected, failures
+  and whether they stopped at the time budget, and exit with code 3 when the run is
+  incomplete. The Python functions return `RunResult` instead of the run directory.
+- Reports (`study report`, `mc report`, `mc boot-report`) refuse a partial run unless
+  `--allow-partial`; `summary.json` now records `complete`, `expected` and `done`.
+- The run config hash ignores `[run] workers`; runs started under the old hash still resume.
+  Hashes quoted in REPORT.md and the committed `summary.json` files are the old
+  whole-config hashes; a regenerated report prints the new one.
+- The sdist now includes `examples/` (used by the CLI test and the quick start) and
+  `REPORT.md`.
+- Tighter R-fixture tolerances (quantile regression 1e-10, covariance 1e-5 / 1%, ESR
+  p-values 0.01, `bw.SJ` 1%).
+
+### Fixed (pre-release audits)
 
 - Worker processes really run with one BLAS thread: the thread variables are set in the
   parent while the pool runs and `threadpoolctl` limits the live pools (before, OpenBLAS
@@ -104,17 +87,26 @@ First feature-complete version. Not tagged and not on PyPI.
   the size-distortion band follows `level`; the `slow-vol` DGP is renamed `unconditional`
   (it is constant-sigma forecasts on the GARCH data). Ignored config keys removed.
 - Study and quick Monte Carlo regenerated with the fixed code (`REPORT.md`).
+- `christoffersen_independence`: a single hit on the first day no longer reports
+  `reason = "no exceedances"`; it reports `"no transitions into a hit"`.
 
-### Found
+### Findings
 
 - `esreg` 0.6.2 returns `-1/z^3` for the second derivative of G2 type 1 (correct: `-2/z^3`).
   It changes misspecification-robust ESR p-values (by up to 0.25 on the reference fixtures).
   Minimal repro: `scripts/r_fixtures/g2pp_repro.R`; analysis in `docs/esreg-covariance.md`.
-  tailcheck uses the correct formula.
+  tailcheck uses the correct formula. Draft upstream report: `docs/upstream/esreg-g2pp.md`.
+- The asymptotic ESR v3 test is conservative because the ES-intercept standard error is
+  negatively correlated with the estimate (about -0.5), not because of bias (0.09 sd) or a
+  uniformly inflated SE; an oracle-SE test has correct size (REPORT section 3).
+- The bootstrap restores the size of the one-sided ESR v3 test (4.3% at 5%, against 1.3%
+  asymptotically) and nearly doubles its power; `esback`'s asymptotic v3 is equally
+  conservative (0 of 250 null samples). See REPORT section 3.1.
 
 ### Known limitations
 
 - In the quick Monte Carlo the one-sided ESR v3 test (asymptotic) is conservative (0-1%
   rejections at 5%), Christoffersen independence is undersized and the dynamic quantile
   test is oversized at alpha = 1%. See `REPORT.md` section 3.
-- Only the quick study and Monte Carlo profiles have been run.
+- Only the quick study and Monte Carlo profiles and the bootstrap ESR size/power study have
+  been run; the full-size profiles have not (see `REPORT.md` section 5 for their cost).

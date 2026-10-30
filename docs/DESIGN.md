@@ -518,7 +518,7 @@ size at n = 500, alpha = 0.025, R = 400, iid normal; rejection rate in [0.02, 0.
 null mean is about 0. McNeil-Frey size at R = 200. One ESR v1 size check at R = 60, n = 1000,
 marked `slow`.
 
-### 6.1 Bootstrap ESR size study and the esback null check (added after 0.1.0)
+### 6.1 Bootstrap ESR size study and the esback null check (added 2026-10-24)
 
 **Question.** The asymptotic one-sided ESR v3 test is conservative in the quick Monte Carlo
 (section 3 of REPORT.md). Does the bootstrap of section 4.3.4 restore its size, at what cost

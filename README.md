@@ -45,8 +45,9 @@ Acerbi-Szekely tests (searched 2026-10-23).
   conservative, in tailcheck and in `esback` alike (about 0-2% rejections at 5% under the
   null; `esback` 0 of 250). With `n_boot > 0` the bootstrap test's size was estimated at
   4.3% (warp-speed Monte Carlo over 1,000 null samples; the full B = 99 bootstrap on 120
-  samples rejected 3.3%), with nearly twice the power (REPORT section 3.1). It costs about 0.3-0.5 s
-  per resample at n = 1000-2000.
+  samples rejected 3.3%), with nearly twice the power (REPORT section 3.1). It costs about
+  0.8-1.6 s per resample at n = 1,400-2,100 (single thread, timed on a loaded machine;
+  `results/retime-full.json`).
 
 ## Install
 
@@ -156,6 +157,8 @@ library; nothing is installed on the host), see `scripts/r_fixtures/` and
 - [docs/esreg-covariance.md](docs/esreg-covariance.md): covariance derivation and the R
   comparison.
 - [REPORT.md](REPORT.md): study and Monte Carlo results.
+- [docs/upstream/esreg-g2pp.md](docs/upstream/esreg-g2pp.md): draft upstream report of the
+  `esreg` discrepancy.
 
 ## Citation
 

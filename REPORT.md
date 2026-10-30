@@ -459,7 +459,7 @@ Per-regime tests (Kupiec, strict ESR, ESR v3, FZ0, Acerbi-Szekely) are in
   `configs/study_full.toml` (ESR bootstrap 50, at 0.8-1.6 s per resample) and 145 for
   `configs/mc_full.toml`, on a machine that was heavily loaded by other jobs: a reference fit
   took 1.4-2.6 times as long as on a quieter machine. Scaled by that factor the estimates are
-  roughly 23-42 and 55-105 CPU-hours; the 0.1.0 projections (20-30 and 35-45) were too low
+  roughly 23-42 and 55-105 CPU-hours; the original projections (20-30 and 35-45) were too low
   for the Monte Carlo profile.
 
 ## 6. Reproduce
