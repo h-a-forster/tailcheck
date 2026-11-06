@@ -19,7 +19,10 @@
 ## Proposed
 
 - The `esback` unit dependence (`scripts/r_fixtures/scale_repro.R`) is reported upstream with the G2'' issue.
-- Bootstrap ESR size and power are measured at alpha = 1% and at more DGPs, including a full-size boot profile (about 25 CPU-hours).
+- Bootstrap ESR size and power are measured at alpha = 1%, at more DGPs and on estimated forecasts, including a full-size boot profile (about 25 CPU-hours).
+- The two-sided v3 bootstrap p-value holds its size (8.1% at n = 1000), or `esr_backtest` stops returning it.
+- The cause of the v3 T* upper-tail mismatch is settled, including a block-bootstrap comparison for serial dependence.
+- The `early_stopping` mismatch is measured for strict ESR (v1) on paired resamples, as it was for v3.
 - The study reports bootstrap ESR p-values, so its v3 column is no longer conservative.
 - The full-size study and Monte Carlo profiles have run on an idle machine, after a fresh re-timing.
 - `esr_backtest` supports constant forecasts in v3 through an intercept-only quantile equation, instead of returning `nan`.

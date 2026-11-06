@@ -109,7 +109,7 @@ small sample, wrap it in a resume-on-failure loop keyed on exit code 3, and watc
 
 ## Status and next steps
 
-Updated: 2026-11-06.
+Updated: 2026-11-07.
 
 Done:
 - Scaffold, `docs/DESIGN.md`, research checks (FRED instead of Stooq; Binance ms->us
@@ -209,6 +209,11 @@ Done:
   pinned. Notes: `docs/release-notes-0.1.0.md`. `pytest --runslow` needs
   `OPENBLAS_NUM_THREADS=1`: with it the three bootstrap fixtures take about 4 minutes each;
   without it the run did not finish in 14.5 minutes.
+
+- T* diagnostic (2026-11-07, `scripts/esr_boot_tstar.py`, REPORT 3.1): the v3 narrowing is
+  not the `early_stopping` mismatch (ratio 0.9999) nor repeated rows; it is in the upper tail,
+  so `_bootstrap` is unchanged and the two-sided v3 bootstrap (8.1%) is not recommended. The
+  stored `mc-esr-boot` statistics still reproduce exactly on the current code (one chunk).
 
 Re-running anything: resume from `runs/<name>/units/`; delete a run directory only to start
 over.

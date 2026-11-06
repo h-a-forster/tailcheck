@@ -45,12 +45,15 @@ Acerbi-Szekely tests (searched 2026-10-23).
   1/10,000 (`scripts/r_fixtures/scale_repro.R`).
 - **Size and power.** A Monte Carlo study reports the rejection rate of every backtest at
   the sample sizes used in practice, with Wilson intervals. See [REPORT.md](REPORT.md).
-- **ESR v3: use the bootstrap.** The asymptotic one-sided intercept test (v3) is
+- **ESR v3: the one-sided bootstrap, where measured.** The asymptotic one-sided intercept test (v3) is
   conservative, in tailcheck and in `esback` alike (about 0-2% rejections at 5% under the
   null; `esback` 0 of 250). With `n_boot > 0` the bootstrap test's size was estimated at
   4.3% (warp-speed Monte Carlo over 1,000 null samples; the full B = 99 bootstrap on 120
-  samples rejected 3.3%), with nearly twice the power (REPORT section 3.1). It costs about
-  0.8-1.6 s per resample at n = 1,400-2,100 (single thread, timed on a loaded machine;
+  samples rejected 3.3%), with nearly twice the power (REPORT section 3.1). That evidence
+  covers `pvalue_bootstrap` for one DGP (GARCH(1,1)-t5 with true forecasts), alpha = 2.5% and
+  n = 1000-2000; alpha = 1%, other DGPs and estimated forecasts are unmeasured. The two-sided
+  bootstrap p-value is oversized there (8.1%, interval 5.8-10.9%): do not use it. It costs
+  about 0.8-1.6 s per resample at n = 1,400-2,100 (single thread, timed on a loaded machine;
   `results/retime-full.json`).
 
 ## Install
@@ -90,7 +93,7 @@ dynamic_quantile(r, q, 0.025, lags=4).pvalue
 mcneil_frey(r, q, e, sigma=s, n_boot=2000, seed=1).pvalue
 esr_backtest(r, e, 0.025, version=1, seed=1).pvalue  # strict ESR, Wald chi2(2)
 esr_backtest(r, e, 0.025, version=3, seed=1).pvalue  # one-sided intercept test (conservative)
-esr_backtest(r, e, 0.025, version=3, n_boot=499, seed=1).details["pvalue_bootstrap"]  # preferred
+esr_backtest(r, e, 0.025, version=3, n_boot=499, seed=1).details["pvalue_bootstrap"]  # see above
 fz0_loss(r, q, e, 0.025).mean()
 ```
 

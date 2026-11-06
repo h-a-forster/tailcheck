@@ -24,10 +24,12 @@ comes from those files; the commands that rebuild them are at the end.
   conservative (0-1%) because the standard error of the ES intercept is negatively
   correlated with the estimate (about -0.5): it is largest exactly when the estimate is
   negative, the direction that would reject; the intercept's bias is negligible (section 3). `esback`'s asymptotic v3 rejects 0
-  of 250 null samples too. The bootstrap restores the size of v3 (4.3% in 1,000 null
-  replications, interval 2.2-6.1%) and nearly doubles its power (0.65 against 0.35-0.37);
-  the strict ESR test is mildly oversized at n = 1000 asymptotically (7.3%) and 6.2% with
-  the bootstrap (section 3.1).
+  of 250 null samples too. In the one DGP measured (`garch-t5`, true forecasts, alpha = 2.5%,
+  n = 1000 and 2000) the bootstrap restores the size of the one-sided v3 test (4.3% in 1,000
+  null replications, interval 2.2-6.1%) and nearly doubles its power at n = 1000 (0.65
+  against 0.35-0.37). Its two-sided p-value is oversized there (8.1%, interval 5.8-10.9%), and
+  alpha = 1%, other DGPs and estimated forecasts are unmeasured. The strict ESR test is mildly
+  oversized at n = 1000 asymptotically (7.3%) and 6.2% with the bootstrap (section 3.1).
 - In the study (5 assets x 5 forecasters x 2 levels, out of sample 2021-01 to 2026-09), 11 of
   50 strict ESR tests reject at 5% before adjustment, 6 after Benjamini-Hochberg and 4 after
   Holm. All 6 BH rejections come with exceedance rates below the nominal level and one-sided
@@ -281,24 +283,54 @@ estimated).
 | strict ESR (v1) | scale-0.85 (power) | 1000 | 400 | 0.185 [0.150, 0.226] | 0.145 [0.062, 0.323] |
 | strict ESR (v1) | normal-tails (power) | 1000 | 400 | 0.193 [0.157, 0.234] | 0.147 [0.080, 0.250] |
 
-- **The bootstrap fixes the conservative v3.** With 1,000 null replications the asymptotic
+- **The bootstrap fixes the conservative one-sided v3 in these cells.** With 1,000 null replications the asymptotic
   one-sided v3 test rejects 1.3%; the bootstrap rejects 4.3%, and its interval covers 5%. The
   exact bootstrap cell agrees (3.3%, 120 replications). The bootstrap 5% critical value of
   the t-statistic is about -1.06 at n = 1000 and -1.28 at n = 2000, against -1.645 for the
   normal. Under the null the observed statistic T0 has roughly unit variance (sd 1.01 at
-  n = 1000, 1.00 at n = 2000) but is shifted right (mean 0.34 at n = 1000) and left-skewed:
-  its 5% quantile is -1.01 at n = 1000 and -1.20 at n = 2000, not -1.645, which is the SE
-  asymmetry of section 3. The bootstrap statistic T* is narrower (sd 0.85-0.88, mean 0.21 at
-  n = 1000) and is not a copy of T0's distribution, but its 5% quantile (-1.06 and -1.28)
-  is close to T0's, which is what the size of a one-sided test depends on.
+  n = 1000, 1.00 at n = 2000) but is shifted right (mean 0.34 at n = 1000) and right-skewed
+  (0.88): its 5% quantile is -1.01 at n = 1000 and -1.20 at n = 2000, not -1.645, which is the
+  SE asymmetry of section 3. The bootstrap statistic T* is narrower (sd 0.85-0.88, mean 0.21 at
+  n = 1000; sd ratio to T0 0.845, interval 0.775-0.921) and is not a copy of T0's
+  distribution. Its 5% quantile (-1.06 and -1.28) is close to T0's, which is what the size of
+  the one-sided test depends on; the narrowing sits in the upper tail (95% quantile 1.79
+  against 2.20 at n = 1000, 1.67 against 2.02 at n = 2000).
+- **The upper-tail mismatch breaks the two-sided v3 bootstrap.** `pvalue_bootstrap_two_sided`
+  compares |T0| with |T*|. Its warp-speed size is 8.1% at n = 1000 (interval 5.8-10.9%, excludes
+  5%) and 7.2% at n = 2000 (4.5-11.8%), against 6.7% and 6.3% for the asymptotic two-sided test
+  on the same replications. These two rates come from the stored statistics of the cells
+  above. Do not use the two-sided value.
+- **Why T* is narrower** (`scripts/esr_boot_tstar.py`, `results/mc-esr-boot/tstar_diagnostic.json`;
+  400 null replications of the v3 n = 1000 cell, seed 20261107, about 26 CPU-minutes, with
+  every option applied to the same resample). The refit's `early_stopping=0`, against 10 for
+  the full-sample fit, is not the cause: refitting with 10 leaves sd(T*) unchanged (ratio
+  0.9999, interval 0.9996-1.0001; correlation 0.999998). The local searches improve the loss
+  in 15% of resamples and T* moves by less than 0.009 in 99%, so the option stays at 0.
+  Repeated rows are not the cause either: noise of 5% of sd(y) on the resampled `y` gives a
+  ratio of 1.02 (0.97-1.07). Nor is the numerator: sd(b* - b_hat) / sd(b_hat) is 0.97
+  (0.84-1.12). The denominator is where they differ. Across samples the estimate and its SE
+  correlate at -0.49 (-0.70 to -0.29), the asymmetry of section 3 that gives T0 its long
+  upper tail; within a sample, b* - b_hat and log(SE*/SE) correlate at only -0.24 (-0.39 to
+  -0.10), and the median SE* is 6% above the median SE. So the resampling reproduces this
+  dependence only in part. That is the likely cause, not a proven one. Serial dependence, which
+  the row bootstrap discards, is not needed for the mismatch but is not excluded: with nearly
+  independent rows the ratio is 0.91 (0.79-1.05), which covers both 0.85 and 1, and the
+  correlations are -0.38 and -0.33. This study ran v3 only, so optimiser noise in v1 (four
+  coefficients; flat loss, see below) is unmeasured.
 - **Power of v3 nearly doubles** at the corrected size: 0.65 against 0.37 (understated
   scale) and 0.35 (normal tails) for the asymptotic test, at n = 1000.
 - **Strict ESR (v1).** The asymptotic test is mildly oversized at n = 1000 (7.3%, interval
   5.8-9.1%; the quick run's 200-replication cells could not resolve this) and close to 5% at
   n = 2000. The bootstrap brings n = 1000 to 6.2% (interval covers 5%). Its power is not
   measurably different from the asymptotic test's (the warp-speed power intervals are wide).
-- **Multiple testing.** Nine cells are reported; the statements above use each interval on
-  its own. None of them rests on a single interval barely excluding 5%.
+- **Multiple testing.** Nine cells and two derived two-sided rates are reported; the
+  statements above use each interval on its own. None of them rests on a single interval
+  barely excluding 5%.
+- **Scope.** The bootstrap recommendation covers the one-sided v3 test at the 5% level, on
+  `garch-t5` with true forecasts, alpha = 2.5%, n = 1000 and 2000 (power at n = 1000 only). It
+  rests on the agreement of one quantile that the study shows but does not explain, so it does
+  not carry over to alpha = 1% (four of the six BH rejections in section 4 are 1% cells with few
+  exceedances), to other DGPs, to estimated forecasts or to other levels.
 
 **esback directly.** `scripts/esback_null/` ran `esback::esr_backtest` (version 0.3.1, esreg
 0.6.2, R 4.6.0 in webR; asymptotic, package defaults) on 250 `garch-t5` null samples

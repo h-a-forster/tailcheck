@@ -24,8 +24,10 @@ install from GitHub (not on PyPI): `uv add git+https://github.com/h-a-forster/ta
   `docs/upstream/esreg-g2pp.md`.
 - Quick Monte Carlo: 231 cells, 296,280 replications, with Wilson intervals for the size and
   power of every test.
-- The asymptotic one-sided ESR v3 test is conservative (here and in `esback`); the bootstrap
-  version has 4.3% size at 5% and nearly twice the power. Use `n_boot > 0` for v3.
+- The asymptotic one-sided ESR v3 test is conservative (here and in `esback`). The one-sided
+  bootstrap has 4.3% size at 5% and nearly twice the power on GARCH(1,1)-t5 data with true
+  forecasts at alpha = 2.5%; nothing else is measured, and the two-sided bootstrap p-value is
+  oversized (8.1%). REPORT section 3.1.
 
 ## Fixed in the 2026-11-06 audit
 

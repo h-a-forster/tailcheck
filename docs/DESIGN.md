@@ -326,7 +326,8 @@ Constant forecasts give `nan` with a reason in every version: the slopes are not
 The primary p-value is two-sided for v1/v2 and one-sided ("less") for v3. In v3 a negative
 intercept means the realized ES of r - e is below 0, so risk is underestimated. `details`
 holds the coefficients, standard errors, both p-values, and the bootstrap p-values when
-`n_boot > 0`. Bootstrap: iid row resampling, refit with `early_stopping=0`, and statistic
+`n_boot > 0`. Bootstrap: iid row resampling, refit with `early_stopping=0` (10 leaves T*
+unchanged in v3; REPORT 3.1), and statistic
 centred at the full-sample estimate (`b* - b_hat`) with the bootstrap covariance. Then
 `p = (1 + #{T* >= T0})/(B+1)` (v1/v2); `|t*| >= |t0|` and `t* <= t0` (v3). If 5% or more of
 the replications fail, the result is `nan` with a reason.
@@ -553,8 +554,11 @@ conservative too") with a direct measurement.
 
 **Result** (REPORT.md section 3.1): bootstrap v3 size 4.3% (n = 1000, 1,000 replications)
 and 4.3% (n = 2000, 400), against 1.3% and 2.0% asymptotically; exact-bootstrap cross-check
-3.3% (120); `esback` v3 one-sided 0 of 250. The bootstrap is therefore the recommended v3
-p-value; the asymptotic one stays the default because it costs one fit instead of B + 1.
+3.3% (120); `esback` v3 one-sided 0 of 250. The one-sided bootstrap is therefore the
+recommended v3 p-value for `garch-t5`-like data at alpha = 2.5% and n = 1000-2000, the only
+region measured; the two-sided one is oversized (8.1% at n = 1000). The asymptotic one stays
+the default because it costs one fit instead of B + 1. `scripts/esr_boot_tstar.py` diagnoses
+the T* narrowing: not the `early_stopping` mismatch, not repeated rows.
 
 ## 7. Validation and test strategy
 
