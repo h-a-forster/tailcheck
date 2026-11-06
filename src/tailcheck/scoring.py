@@ -48,8 +48,12 @@ def default_lags(t: int) -> int:
 def mean_with_ci(x: ArrayLike, lags: int | None = None, level: float = 0.95) -> dict[str, float]:
     """Mean with a Newey-West confidence interval."""
     xa = as_float_1d(x, "x")
+    if not 0 < level < 1:
+        raise ValueError("level must be in (0, 1)")
     t = len(xa)
-    lags = default_lags(t) if lags is None else lags
+    lags = default_lags(t) if lags is None else int(lags)
+    if lags < 0:
+        raise ValueError("lags must be >= 0")
     se = math.sqrt(max(newey_west_lrv(xa, lags), 0.0) / t)
     z = float(stats.norm.ppf(0.5 + level / 2))
     m = float(xa.mean())
@@ -144,6 +148,8 @@ def model_confidence_set(
         raise ValueError("losses contain NaN or infinite values")
     if not 0 < size < 1:
         raise ValueError("size must be in (0, 1)")
+    if method not in ("R", "max"):
+        raise ValueError("method must be 'R' or 'max'")
     bs = int(math.ceil(math.sqrt(len(losses)))) if block_size is None else int(block_size)
     mcs = MCS(
         losses.astype(float),

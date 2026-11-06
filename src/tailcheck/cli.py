@@ -166,6 +166,9 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError, DataError, ConfigMismatchError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    except KeyError as exc:
+        print(f"error: missing key {exc}; check the config file", file=sys.stderr)
+        return 2
 
 
 def _dispatch(args: argparse.Namespace) -> int:

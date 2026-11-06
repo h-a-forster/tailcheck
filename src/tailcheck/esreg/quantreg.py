@@ -21,6 +21,17 @@ def _prep(y: ArrayLike, x: ArrayLike) -> tuple[NDArray[np.float64], NDArray[np.f
     return ya, xa
 
 
+def scale_of(a: NDArray[np.float64]) -> float:
+    """``sd(a)`` if it lies outside [0.1, 1000], else 1 (constant columns also give 1).
+
+    Divisor for the numerical steps with absolute tolerances (HiGHS feasibility, BFGS), so
+    returns in decimals or a P&L in currency units solve as well as returns in percent. Inside
+    the band the data are left untouched, so results there do not depend on this rescaling.
+    """
+    sd = float(np.std(a))
+    return sd if sd > 0 and not 0.1 <= sd <= 1000.0 else 1.0
+
+
 def quantile_regression(y: ArrayLike, x: ArrayLike, tau: float) -> NDArray[np.float64]:
     """Koenker-Bassett (1978) estimate of ``beta`` minimising the check loss.
 
@@ -35,14 +46,16 @@ def quantile_regression(y: ArrayLike, x: ArrayLike, tau: float) -> NDArray[np.fl
         # Intercept only: an LP vertex solution is the order statistic y_(ceil(n tau)).
         idx = max(math.ceil(n * tau - 1e-12), 1) - 1
         return np.array([np.partition(ya, idx)[idx] / xa[0, 0]])
+    sy = scale_of(ya)
+    sx = np.array([scale_of(xa[:, j]) for j in range(k)])
     c = np.concatenate([np.zeros(k), np.full(n, tau), np.full(n, 1.0 - tau)])
     eye = sparse.identity(n, format="csr")
-    a_eq = sparse.hstack([sparse.csr_matrix(xa), eye, -eye], format="csr")
+    a_eq = sparse.hstack([sparse.csr_matrix(xa / sx), eye, -eye], format="csr")
     bounds = [(None, None)] * k + [(0.0, None)] * (2 * n)
-    res = optimize.linprog(c, A_eq=a_eq, b_eq=ya, bounds=bounds, method="highs")
+    res = optimize.linprog(c, A_eq=a_eq, b_eq=ya / sy, bounds=bounds, method="highs")
     if res.status != 0:
         raise RuntimeError(f"quantile regression LP failed: {res.message}")
-    return np.asarray(res.x[:k], dtype=np.float64)
+    return np.asarray(res.x[:k], dtype=np.float64) * sy / sx
 
 
 def hall_sheather(n: int, tau: float, level: float = 0.05) -> float:

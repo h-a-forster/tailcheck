@@ -26,7 +26,7 @@ BINANCE_URL = (
     "https://data.binance.vision/data/spot/monthly/klines/{symbol}/1d/{symbol}-1d-{ym}.zip"
 )
 FRED_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
-_UA = {"User-Agent": "tailcheck (research; +https://github.com/)"}
+_UA = {"User-Agent": "tailcheck (research; +https://github.com/h-a-forster/tailcheck)"}
 
 
 class DataError(RuntimeError):

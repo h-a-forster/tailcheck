@@ -87,6 +87,16 @@ def test_mean_with_ci() -> None:
     assert ci["lo"] < 0 < ci["hi"] and ci["se"] == pytest.approx(1 / math.sqrt(5000), rel=0.1)
 
 
+def test_invalid_options_raise() -> None:
+    x = np.arange(20.0)
+    with pytest.raises(ValueError):
+        mean_with_ci(x, lags=-1)
+    with pytest.raises(ValueError):
+        mean_with_ci(x, level=2.0)
+    with pytest.raises(ValueError):
+        model_confidence_set(pd.DataFrame({"a": x, "b": x[::-1]}), method="x")  # type: ignore[arg-type]
+
+
 def test_mcs_keeps_best_model() -> None:
     rng = np.random.default_rng(3)
     t = 500

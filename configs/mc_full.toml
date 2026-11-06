@@ -8,6 +8,9 @@
 # machine: 145 CPU-hours as measured (ESR 133: 4.9, 7.6-7.9, 13.6-15.7 and 47-63 s per
 # replication at n = 500, 1000, 2000, 5000); a reference fit ran 1.4-2.6 times slower than
 # on a quieter machine, so roughly 55-105 CPU-hours idle. The projection above is too low.
+# Those figures predate dropping the constant-forecast DGPs (iid-t5, unconditional) from [esr]:
+# the slopes are not identified there, so esr_backtest returns nan. ESR replications per
+# (n, alpha) fell from 2,900 to 1,600, so its share of the cost falls by about 45%.
 name = "mc-full"
 seed = 20261023
 level = 0.05
@@ -29,8 +32,8 @@ versions = [1, 2, 3]
 n = [500, 1000, 2000, 5000]
 alphas = [0.01, 0.025]
 extra_cells = []
-dgps_size = ["garch-t5", "iid-t5"]
-dgps_power = ["scale-0.85", "normal-tails", "unconditional"]
+dgps_size = ["garch-t5"]
+dgps_power = ["scale-0.85", "normal-tails"]
 reps_size = 1000
 reps_power = 300
 

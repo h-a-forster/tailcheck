@@ -10,7 +10,7 @@ Specification: ``docs/DESIGN.md`` section 4.3.4.
 from __future__ import annotations
 
 import math
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -79,6 +79,8 @@ def esr_backtest(
     quantile residuals, a failed fit or a singular covariance give ``pvalue = nan`` with
     ``details["reason"]``. ``_keep_boot_stats`` stores the centred bootstrap statistics in
     ``details["bootstrap_stats"]`` (used by the warp-speed Monte Carlo of the bootstrap test).
+    The statistics do not depend on the scale of ``r``, ``e`` and ``q`` (percent, decimals or
+    currency units).
     """
     alpha = check_alpha(alpha)
     if version not in (1, 2, 3):
@@ -90,6 +92,12 @@ def esr_backtest(
     )
     if n_boot < 0:
         raise ValueError("n_boot must be >= 0")
+    if early_stopping < 0:
+        raise ValueError("early_stopping must be >= 0")
+    if sparsity not in get_args(Sparsity):
+        raise ValueError(f"unknown sparsity estimator {sparsity!r}")
+    if sigma_est not in get_args(SigmaEstimator):
+        raise ValueError(f"unknown sigma estimator {sigma_est!r}")
     name = f"esr_v{version}"
     alt: Literal["two-sided", "less"] = "less" if version == 3 else "two-sided"
     df = 2 if version in (1, 2) else None
@@ -104,6 +112,8 @@ def esr_backtest(
     kq, ke = 2, (2 if xe is not None else 1)
     if n * alpha < kq + ke + 1:
         return undefined(f"too few expected exceedances (n*alpha = {n * alpha:.1f})")
+    if np.ptp(xq) == 0 or (xe is not None and np.ptp(xe) == 0):
+        return undefined("constant forecasts: the regression slopes are not identified")
     try:
         fit = _fit(y, xq, xe, alpha, early_stopping, seed)
     except (ValueError, RuntimeError, np.linalg.LinAlgError) as exc:
@@ -178,6 +188,7 @@ def esr_backtest(
                 sigma_est,
                 misspec,
                 keep_stats=_keep_boot_stats,
+                esreg_compat_g2pp=_esreg_compat_g2pp,
             )
         )
     return BacktestResult(name, stat, p, n, df, alt, details)
@@ -197,6 +208,7 @@ def _bootstrap(
     sigma_est: SigmaEstimator,
     misspec: bool,
     keep_stats: bool = False,
+    esreg_compat_g2pp: bool = False,
 ) -> dict[str, Any]:
     """iid row bootstrap; statistic centred at the full-sample estimate (DESIGN 4.3.4)."""
     rng = np.random.default_rng(None if seed is None else seed + 7919)
@@ -215,7 +227,9 @@ def _bootstrap(
                 0,
                 int(rng.integers(1 << 31)),
             )
-            cov_b, _ = vcov_details(fb, sparsity, sigma_est, misspec)
+            cov_b, _ = vcov_details(
+                fb, sparsity, sigma_est, misspec, _esreg_compat_g2pp=esreg_compat_g2pp
+            )
             d = fb.coef_e - fit.coef_e
             ce = cov_b[kq:, kq:]
             if np.linalg.eigvalsh(ce).min() <= 0:

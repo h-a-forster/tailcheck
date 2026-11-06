@@ -175,7 +175,7 @@ def _scripted_bootstrap(
         coef, var = next(it)
         return SimpleNamespace(coef_e=np.asarray(coef, float), var=np.asarray(var, float))
 
-    def fake_vcov(fb: SimpleNamespace, *args: object) -> tuple[np.ndarray, dict]:
+    def fake_vcov(fb: SimpleNamespace, *args: object, **kwargs: object) -> tuple[np.ndarray, dict]:
         cov = np.diag(np.concatenate([[9.0, 9.0], fb.var]))  # quantile block is ignored
         return cov, {}
 

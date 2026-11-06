@@ -16,7 +16,13 @@ from scipy import optimize, special, stats
 
 from tailcheck.esreg.estimator import ESRegFit
 from tailcheck.esreg.gfuns import G2, g1_prime, g1_prime_prime, g2, g2_prime, g2_prime_prime
-from tailcheck.esreg.quantreg import bofinger, chamberlain, hall_sheather, quantile_regression
+from tailcheck.esreg.quantreg import (
+    bofinger,
+    chamberlain,
+    hall_sheather,
+    quantile_regression,
+    scale_of,
+)
 
 Sparsity = Literal["iid", "nid"]
 SigmaEstimator = Literal["ind", "scl_N", "scl_sp"]
@@ -155,6 +161,9 @@ def bandwidth_sj(x: ArrayLike, nbins: int = 20_000, max_exact: int = 10_000) -> 
 
 def location_scale_fit(y: Arr, x: Arr) -> tuple[Arr, Arr]:
     """Gaussian PMLE of ``y = x'zeta + (x'phi) eps``; returns fitted (mu, sigma)."""
+    sy = scale_of(y)
+    y = y / sy
+    x = x / np.array([scale_of(x[:, j]) for j in range(x.shape[1])])
     k = x.shape[1]
     zeta0, *_ = np.linalg.lstsq(x, y, rcond=None)
     absres = np.abs(y - x @ zeta0)
@@ -181,7 +190,7 @@ def location_scale_fit(y: Arr, x: Arr) -> tuple[Arr, Arr]:
             best = res.x
             if res.success:
                 break
-    return x @ best[:k], x @ best[k:]
+    return sy * (x @ best[:k]), sy * (x @ best[k:])
 
 
 def _density_iid(u: Arr, kq: int, h: float) -> float:

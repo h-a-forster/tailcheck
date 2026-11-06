@@ -149,6 +149,8 @@ def test_esreg_scale_equivariance() -> None:
     a = esreg(y, x, x, 0.025, seed=2)
     b = esreg(3 * y, x, x, 0.025, seed=2)
     np.testing.assert_allclose(b.coef, 3 * a.coef, rtol=2e-3, atol=2e-3)
+    small = esreg(1e-4 * y, x, x, 0.025, seed=2)  # the ES of y sits inside the absolute barrier
+    np.testing.assert_allclose(small.coef, 1e-4 * a.coef, rtol=2e-3, atol=2e-7)
 
 
 def test_esreg_consistency_dgp2() -> None:

@@ -20,7 +20,7 @@ import tempfile
 import time
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, BrokenExecutor, Future, ProcessPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -233,8 +233,9 @@ class UnitStore:
 
         ``inputs`` describes what the configuration hash does not cover (input data hashes,
         package version). It is stored in the manifest; reopening with different ``inputs``
-        raises :class:`ConfigMismatchError` unless ``force_new`` is set, so a resume never
-        mixes units computed on different data. The source hash of the code is recorded
+        raises :class:`ConfigMismatchError`, so a resume never mixes units computed on
+        different data. ``force_new`` deletes all finished units and starts over, whether or
+        not anything changed. The source hash of the code is recorded
         too; a change only produces a warning (and a ``progress.log`` line), because
         documentation edits should not invalidate a long run.
 
@@ -275,12 +276,12 @@ class UnitStore:
                     f"{self.root} was computed on different inputs "
                     f"(stored {old.get('inputs')}, now {inputs_j})"
                 )
-            if problem is not None:
-                if not force_new:
-                    raise ConfigMismatchError(f"{problem}; use a new directory or force_new=True")
+            if force_new:
                 for p in self.units_dir.glob("*"):
                     p.unlink()
                 manifest.unlink()
+            elif problem is not None:
+                raise ConfigMismatchError(f"{problem}; use a new directory or force_new=True")
             elif old.get("source_hash") != code:
                 msg = (
                     f"resuming {self.root} with changed code (source hash "
@@ -421,7 +422,8 @@ def run_units(
     ``fn`` must be a picklable module-level function when ``workers > 1``. At most
     :data:`MAX_WORKERS` processes are used; each sets BLAS thread counts to 1. With
     ``on_error="log"`` a failing unit is logged and skipped (it stays not-done, so a rerun
-    retries it); with ``"raise"`` the first failure propagates after finished units are saved.
+    retries it), and a worker process that dies ends the session the same way; with
+    ``"raise"`` the first failure propagates after finished units are saved.
     With ``max_seconds`` no new unit is started after that much wall time; units already
     running finish and are stored, and ``stats["stopped"]`` is 1 (a rerun resumes).
     """
@@ -473,10 +475,23 @@ def run_units(
     ):
         pending: dict[Future[tuple[dict[str, object], float]], str] = {}
         it: Iterable[tuple[str, Any]] = iter(todo)
-        for uid, arg in it:
-            pending[pool.submit(_timed, fn, arg)] = uid
-            if len(pending) >= 2 * workers:
-                break
+        pool_alive = True
+
+        def top_up() -> None:
+            nonlocal pool_alive
+            if not pool_alive:
+                return
+            for uid, arg in it:
+                try:
+                    pending[pool.submit(_timed, fn, arg)] = uid
+                except BrokenExecutor as exc:  # a worker died: stop here, a rerun resumes
+                    pool_alive = False
+                    fail(uid, exc)
+                    return
+                if len(pending) >= 2 * workers:
+                    return
+
+        top_up()
         while pending:
             finished, _ = wait(pending, return_when=FIRST_COMPLETED)
             for fut in finished:
@@ -497,8 +512,5 @@ def run_units(
                 for f in [f for f in pending if f.cancel()]:
                     del pending[f]
                 continue
-            for uid, arg in it:
-                pending[pool.submit(_timed, fn, arg)] = uid
-                if len(pending) >= 2 * workers:
-                    break
+            top_up()
     return stats

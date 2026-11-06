@@ -83,8 +83,10 @@ class _Objective:
         alpha: float,
         g1: G1,
         g2: G2,
+        barrier: float = -0.01,
     ) -> None:
         self.y, self.xq, self.xe, self.alpha, self.g1, self.g2 = y, xq, xe, alpha, g1, g2
+        self.barrier = barrier
         self.kq = xq.shape[1]
         self.neg = g2 in NEGATIVE_DOMAIN
         self.fz0 = g1 == G1.ZERO and g2 == G2.NEG_INV
@@ -92,7 +94,7 @@ class _Objective:
     def __call__(self, b: NDArray[np.float64]) -> float:
         q = self.xq @ b[: self.kq]
         e = self.xe @ b[self.kq :]
-        if self.neg and np.any(e >= -0.01):
+        if self.neg and np.any(e >= self.barrier):
             return np.inf
         if self.fz0:  # G1 = 0, G2 = -1/z is the FZ0 loss; written out for speed
             u = np.maximum(q - self.y, 0.0)
@@ -107,10 +109,24 @@ def _local_search(obj: _Objective, b0: NDArray[np.float64]) -> tuple[NDArray[np.
     return np.asarray(res.x, dtype=np.float64), float(res.fun)
 
 
-def _fix_es_intercept(b: NDArray[np.float64], xe: NDArray[np.float64], kq: int, thr: float) -> None:
+def _fix_es_intercept(
+    b: NDArray[np.float64], xe: NDArray[np.float64], kq: int, thr: float, margin: float
+) -> None:
     m = float(np.max(xe @ b[kq:]))
     if m >= thr:
-        b[kq] -= m + 0.1
+        b[kq] -= m + margin
+
+
+def _data_unit(y: NDArray[np.float64]) -> float:
+    """Multiplier for the estimator's absolute constants: ``min(1, 10 sd(y))``.
+
+    The ES barrier (-0.01) and start margin (0.1) are sized for returns in percent. Left
+    absolute, they exceed the distance from ``max(y)`` to the ES of a small-scale series
+    (daily sd around 1e-3 and below), which makes the true ES infeasible. They therefore shrink
+    with the data below sd 0.1, and the fit stays scale equivariant (DESIGN 4.3.2).
+    """
+    sd = float(np.std(y))
+    return min(1.0, 10.0 * sd) if sd > 0 else 1.0
 
 
 def esreg(
@@ -148,22 +164,23 @@ def esreg(
     neg = g2 in NEGATIVE_DOMAIN
     shift = float(np.max(ya)) if neg else 0.0
     ys = ya - shift
+    unit = _data_unit(ys)
 
     bq0 = quantile_regression(ys, xq_m, alpha)
     at = alpha_tilde(alpha)
     be0 = quantile_regression(ys, xe_m, at)
     b0 = np.concatenate([bq0, be0])
     if neg:
-        _fix_es_intercept(b0, xe_m, kq, -0.1)
+        _fix_es_intercept(b0, xe_m, kq, -0.1 * unit, 0.1 * unit)
     se = np.concatenate(
         [
             quantile_regression_se_iid(ys, xq_m, alpha, bq0),
             quantile_regression_se_iid(ys, xe_m, at, be0),
         ]
     )
-    se = np.where(np.isfinite(se) & (se > 0), se, 1e-3)
+    se = np.where(np.isfinite(se) & (se > 0), se, 1e-3 * unit)
 
-    obj = _Objective(ys, xq_m, xe_m, alpha, g1, g2)
+    obj = _Objective(ys, xq_m, xe_m, alpha, g1, g2, barrier=-0.01 * unit)
     best_b, best_f = _local_search(obj, b0)
     n_searches = 1
     if early_stopping > 0:
@@ -172,7 +189,7 @@ def esreg(
         while fails < early_stopping:
             cand = best_b + rng.standard_normal(len(best_b)) * se
             if neg:
-                _fix_es_intercept(cand, xe_m, kq, 0.0)
+                _fix_es_intercept(cand, xe_m, kq, 0.0, 0.1 * unit)
             b, f = _local_search(obj, cand)
             n_searches += 1
             if f < best_f - 1e-12:

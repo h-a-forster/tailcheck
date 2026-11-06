@@ -51,6 +51,11 @@ def test_hash_mismatch_refused(tmp_path: Path) -> None:
     assert not fresh.done("u")
 
 
+def test_force_new_starts_over_on_an_unchanged_config(tmp_path: Path) -> None:
+    UnitStore(tmp_path, "abc").write("u", {})
+    assert not UnitStore(tmp_path, "abc", force_new=True).done("u")
+
+
 def test_config_hash_stable() -> None:
     assert config_hash({"a": 1, "b": [1, 2]}) == config_hash({"b": [1, 2], "a": 1})
     assert config_hash({"a": 1}) != config_hash({"a": 2})
@@ -111,6 +116,21 @@ def test_run_units_process_pool(tmp_path: Path) -> None:
     assert stats["ran"] == 6
     assert [store.read(f"u{i}")["value"] for i in range(6)] == [i * i for i in range(6)]
     assert checkpoint.MAX_WORKERS == 4
+
+
+def _die_on_three(x: int) -> dict[str, object]:
+    if x == 3:
+        os._exit(1)
+    return {"y": x}
+
+
+def test_dead_worker_ends_the_session_for_a_resume(tmp_path: Path) -> None:
+    store = UnitStore(tmp_path, "abc")
+    units = [(f"u{i}", i) for i in range(12)]
+    stats = run_units(store, units, _die_on_three, workers=2, on_error="log")
+    assert stats["failed"] >= 1
+    run_units(store, units, _square, workers=2)
+    assert len(store.completed()) == 12
 
 
 def _blas_threads(_: int) -> dict[str, object]:

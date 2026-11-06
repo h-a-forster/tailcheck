@@ -16,6 +16,7 @@ from tailcheck.esr_backtest import esr_backtest
 FIX = Path(__file__).parent / "fixtures" / "r"
 REF = json.loads((FIX / "outputs" / "r_reference.json").read_text())
 FC = pd.read_csv(FIX / "inputs" / "forecasts.csv")
+EXAMPLE = pd.read_csv(Path(__file__).parent.parent / "examples" / "garch_t5.csv")
 FAST = {("true", 0.025, 1, "scl_N"), ("normal", 0.025, 3, "scl_sp"), ("scale", 0.01, 2, "scl_N")}
 
 
@@ -81,6 +82,56 @@ def test_esr_too_few_hits_is_nan() -> None:
     r = np.random.default_rng(0).standard_normal(100)
     res = esr_backtest(r, np.full(100, -2.3) + 0.01 * r, 0.025)
     assert math.isnan(res.pvalue) and "too few" in res.details["reason"]
+
+
+@pytest.mark.parametrize(
+    ("version", "c"),
+    [(1, 1e-7), (1, 1e-3), (3, 1e-3), (1, 1e7)],
+    ids=["tiny", "decimal-low-vol", "decimal-low-vol-v3", "currency"],
+)
+def test_esr_statistic_does_not_depend_on_scale(version: int, c: float) -> None:
+    """A correct model must not be rejected because its returns are not in percent."""
+    r, e = EXAMPLE.r.to_numpy(), EXAMPLE.e.to_numpy()
+    base = esr_backtest(r, e, 0.025, version, seed=1).statistic  # type: ignore[arg-type]
+    scaled = esr_backtest(r * c, e * c, 0.025, version, seed=1).statistic  # type: ignore[arg-type]
+    assert scaled == pytest.approx(base, rel=0.01)
+
+
+def test_esr_invalid_options_raise() -> None:
+    r, e = FC.r.to_numpy(), FC.e_true_025.to_numpy()
+    for bad in ({"sparsity": "x"}, {"sigma_est": "x"}, {"early_stopping": -1}):
+        with pytest.raises(ValueError):
+            esr_backtest(r, e, 0.025, **bad)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("version", [1, 2, 3])
+def test_esr_constant_forecasts_are_undefined(version: int) -> None:
+    n = len(FC)
+    res = esr_backtest(
+        FC.r.to_numpy(),
+        np.full(n, -2.7),
+        0.025,
+        version,  # type: ignore[arg-type]
+        q=np.full(n, -2.0),
+        seed=1,
+    )
+    assert math.isnan(res.pvalue) and "constant" in res.details["reason"]
+
+
+def test_esr_compat_flag_reaches_the_bootstrap() -> None:
+    """T0 and T* must use the same covariance, or the compat p-value mixes two tests."""
+    kw = {"n_boot": 2, "seed": 1, "_keep_boot_stats": True}
+    r, e = FC.r.to_numpy()[:600], FC.e_scale_025.to_numpy()[:600]
+    plain = esr_backtest(r, e, 0.025, 1, **kw).details["bootstrap_stats"]  # type: ignore[arg-type]
+    compat = esr_backtest(
+        r,
+        e,
+        0.025,
+        1,
+        _esreg_compat_g2pp=True,
+        **kw,  # type: ignore[arg-type]
+    ).details["bootstrap_stats"]
+    assert plain != compat
 
 
 def test_esr_version2_needs_q() -> None:

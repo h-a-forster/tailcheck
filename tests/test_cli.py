@@ -75,6 +75,15 @@ def test_report_without_run_is_clean_error(
     assert not (tmp_path / "results").exists() and not (tmp_path / "runs").exists()
 
 
+def test_incomplete_config_is_clean_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cfg = tmp_path / "c.toml"
+    cfg.write_text('name = "x"\n')
+    assert main(["mc", "report", "--config", str(cfg)]) == 2
+    assert "error:" in capsys.readouterr().err
+
+
 def test_mc_boot_subcommands_parse() -> None:
     from tailcheck.cli import build_parser
 
