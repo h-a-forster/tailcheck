@@ -2,7 +2,7 @@
 
 Guide for coding agents (and humans) working on tailcheck. Read `docs/DESIGN.md` before
 changing any statistics. It holds the formulas, reference values and milestones this file
-points to.
+points to. Open work lives in `backlog.md`.
 
 ## What this is
 
@@ -16,7 +16,8 @@ and equity indices.
 - uv + hatchling, `src/` layout, Python >= 3.11 (local dev pinned to 3.13 by
   `.python-version`), typed code, `ruff check` + `ruff format` (line length 100), pytest.
 - Sign convention: `r`, `q` (VaR) and `e` (ES) on the return scale; `e <= q < 0` in the left
-  tail; hit = `r <= q`. Returns in percent log returns.
+  tail; hit = `r <= q`. The study and forecasters use percent log returns; the backtests
+  accept any unit (DESIGN 12, Units).
 - Every test returns `BacktestResult`. Statistically undefined input gives `pvalue = nan` plus
   `details["reason"]`; invalid input raises `ValueError`.
 - Simulation and bootstrap p-values use `(1 + count)/(B + 1)`. Every stochastic function takes
@@ -30,8 +31,8 @@ and equity indices.
 - `esreg`/`esback` are GPL-3. Implement from the papers; use the R packages only as
   black-box oracles through `scripts/r_fixtures/` (webR). Do not translate their source.
 - Scratch files go in `tmp/` (gitignored). Do not create `.bak` copies; use git.
-- Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Do not push and
-  do not create remote repositories; publishing is done separately after review.
+- Do not push and do not create remote repositories; publishing is done separately after
+  review.
 - Statistical honesty: report sizes, seeds, versions and intervals; adjust for multiple
   testing where DESIGN says so; never overstate. Before calling anything a library bug,
   produce a minimal repro and rule out an adapter mistake.
@@ -55,7 +56,7 @@ and equity indices.
 | `src/tailcheck/cli.py` | `tailcheck backtest / mc / study / data` | M10 |
 | `configs/` | study and Monte Carlo configs (quick + full) | - |
 | `scripts/reference_values.py` | independent recomputation of the reference values in DESIGN | done |
-| `scripts/r_fixtures/` | webR runner (`run_r.mjs`) for R oracle fixtures | runner done; R scripts M4 |
+| `scripts/r_fixtures/` | webR runner (`run_r.mjs`), R fixture scripts and repros | M4 |
 | `scripts/esback_null/` | esback asymptotic ESR on simulated null data (webR) vs tailcheck | DESIGN 6.1 |
 | `scripts/retime_full.py` | re-time samples of the full-size profiles | - |
 | `tests/fixtures/r/` | committed R inputs (CSV) and outputs (JSON) | M4 |
@@ -81,7 +82,7 @@ The runner patches a Windows path bug in webR 0.6.0's worker inside the gitignor
 `node_modules` copy. The first run downloads the R packages from repo.r-wasm.org (about 1
 minute).
 
-## How to run the study and the Monte Carlo (after M7-M9)
+## How to run the study and the Monte Carlo
 
 ```sh
 uv run tailcheck data fetch  --config configs/study.toml
@@ -93,11 +94,11 @@ uv run tailcheck mc boot-run --config configs/mc_esr_boot.toml --workers 3 --max
 uv run tailcheck mc boot-report --config configs/mc_esr_boot.toml
 ```
 
-Full size: `configs/study_full.toml` (daily refits, bootstrap ESR; projected 20-30
-CPU-hours) and `configs/mc_full.toml` (projected 35-45 CPU-hours); projections, not
-measurements (see the config headers). Both resume from `runs/<name>/units/`. A run directory
-refuses to resume when the config, the processed data or the package version changed (use
-`--force-new` or a new `out_dir`; `--force-new` deletes every finished unit); changed code
+Full size: `configs/study_full.toml` (daily refits, bootstrap ESR) and
+`configs/mc_full.toml`; see the re-timing below and the config headers. Both resume from
+`runs/<name>/units/`. A run directory
+refuses to resume when the config, the processed data or the package version changed (use a
+new `out_dir` or `--force-new`, which always deletes every finished unit); changed code
 only warns, and `[run] workers` is not part of the config hash (or use `--workers`). A run
 command exits 0 only when every configured unit is done; it exits 3 when the session stopped
 at `--max-minutes` or left failed units (rerun to resume), and 2 on errors. Reports are
@@ -108,7 +109,7 @@ small sample, wrap it in a resume-on-failure loop keyed on exit code 3, and watc
 
 ## Status and next steps
 
-Updated: 2026-10-30.
+Updated: 2026-11-06.
 
 Done:
 - Scaffold, `docs/DESIGN.md`, research checks (FRED instead of Stooq; Binance ms->us
@@ -201,13 +202,13 @@ Done:
   current CRAN release and GitHub `main`); upstream issue drafted in
   `docs/upstream/esreg-g2pp.md` (not filed).
 
-Next (not done):
-- Full-size profiles (`configs/study_full.toml`, `configs/mc_full.toml`); see the re-timing
-  above for the cost. Run on an otherwise idle machine and re-time first.
-- Bootstrap ESR at alpha = 1% and on `iid-t5`; bootstrap p-values in the study (the quick
-  study's v3 column is conservative, REPORT 3.1). Full-size boot profile: warp reps x 5, exact
-  cell 300 reps with n_boot = 199 (about 25 CPU-hours, see the config header).
-- Tag v0.1.0 and file the esreg issue (`docs/upstream/esreg-g2pp.md`); both need the
-  owner's go-ahead.
-- Re-running anything: resume from `runs/<name>/units/`; delete a run directory only to
-  start over.
+- Third audit (2026-11-06) fixed: the ESR tests depended on the unit of the data (absolute
+  barrier, LP and BFGS tolerances; DESIGN 12); constant forecasts now give `nan` in every ESR
+  version; invalid options raise; `--force-new` no longer ignored on an unchanged config; a
+  dead worker ends the session with exit 3; compat flag reaches the bootstrap; CI actions
+  pinned. Notes: `docs/release-notes-0.1.0.md`. `pytest --runslow` needs
+  `OPENBLAS_NUM_THREADS=1`: with it the three bootstrap fixtures take about 4 minutes each;
+  without it the run did not finish in 14.5 minutes.
+
+Re-running anything: resume from `runs/<name>/units/`; delete a run directory only to start
+over.

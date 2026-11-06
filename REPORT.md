@@ -1,7 +1,8 @@
 # tailcheck v0.1 report: validation and forecaster study
 
-Generated 2026-10-23 from the committed files under `results/`. Every number below comes from
-those files; the commands that rebuild them are at the end.
+Generated 2026-10-23 and 2026-10-24 from the committed files under `results/`; section 3.1
+dates from 2026-10-24 and the units note in section 2.2 from 2026-11-06. Every number below
+comes from those files; the commands that rebuild them are at the end.
 
 **Summary.**
 
@@ -44,6 +45,7 @@ those files; the commands that rebuild them are at the end.
 | Software | Python 3.13.1, numpy 2.5.4, scipy 1.18.1, pandas 3.1.0, arch 8.0.0; Windows 11, CPU only, 4 worker processes |
 | Study config | `configs/study.toml` (hash `b5e6bab664e5e3e2`), seed 20261023 |
 | Monte Carlo config | `configs/mc_quick.toml`, seed 20261023 |
+| Later code | The 2026-11-06 fixes do not change results on percent data: 10 ESR p-values on 5 study cells, rerun, match `backtests.csv` to all six stored digits |
 | R references | `esreg` 0.6.2, `esback` 0.3.1, `quantreg` 6.1 on R 4.6.0 (webR 0.6.0) |
 
 **Earlier versions of these results.** The first published numbers came from commit
@@ -124,6 +126,12 @@ median of 0.034 and at most 0.76 (`results/study-v1/backtests.csv`, columns `esr
 `esr_v1_esback_p`); 6 cells are BH-significant with the correct formula and 4 with esreg's.
 Details: `docs/esreg-covariance.md`.
 
+**Units.** The strict ESR statistic should not change when `r`, `q` and `e` are rescaled.
+tailcheck's now does not (tested at 1e-7, 1e-3 and 1e7 times the example data; at commit
+`b6b715c`, 1e-3 gave p = 0.003 instead of 0.215). `esback` 0.3.1 changes: 0.19, 0.38, 0.95, 1.00 and
+0.00 at scales 1, 0.01, 0.002, 0.001 and 0.0001 (`scripts/r_fixtures/scale_repro.R`). All
+fixtures and all results in this report are in percent, where the comparison above holds.
+
 ## 3. Monte Carlo size and power
 
 Configuration `configs/mc_quick.toml` (hash `c7b1a7514ee396dd`, seed 20261023); full
@@ -160,7 +168,7 @@ clustered intervals change no conclusion.
 
 | test | n=250, 1% | n=250, 2.5% | n=1000, 2.5% | n=2000, 1% | n=2000, 2.5% |
 |---|---|---|---|---|---|
-| Kupiec | 0.086 | 0.072 | 0.051 | 0.045 | 0.048 |
+| Kupiec | 0.086 | 0.073 | 0.051 | 0.045 | 0.048 |
 | Christoffersen ind | 0.015 | 0.008 | 0.013 | 0.021 | 0.025 |
 | Christoffersen cc | 0.005 | 0.023 | 0.040 | 0.034 | 0.042 |
 | DQ | 0.091 | 0.079 | 0.060 | 0.089 | 0.058 |
@@ -411,7 +419,8 @@ Strict-ESR rejections (raw / BH): crypto 6 / 2 of 20 cells, equity 5 / 4 of 30 c
 of the six raw crypto rejections are on BTCUSDT at 1% (all four models other than `gjr-t`).
 
 Regimes split the out-of-sample days by the ex-ante 63-day realized volatility, above or
-below its per-asset median. Pooled exceedance rates (about 4,240 days per regime and level):
+below its per-asset median over the whole out-of-sample period (so the threshold is known
+only afterwards; the split is descriptive, not a tradable signal). Pooled exceedance rates (about 4,240 days per regime and level):
 
 | model | 1% calm | 1% turbulent | 2.5% calm | 2.5% turbulent |
 |---|---|---|---|---|

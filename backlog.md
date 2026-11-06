@@ -1,0 +1,25 @@
+# Backlog
+
+## In progress
+
+## Waiting on me
+
+- Branch `polish-2026-10-30` is merged through a pull request with a green first CI run (no workflow has ever run on GitHub).
+- Private vulnerability reporting is enabled, so the route in `SECURITY.md` works.
+- The repository description no longer claims Monte Carlo checks for FZ0 scoring and model confidence sets (text in `pyproject.toml`).
+- v0.1.0 is tagged, with `CHANGELOG.md` and the release notes carrying the tag date.
+- The `esreg` G2'' issue is filed (`docs/upstream/esreg-g2pp.md`).
+
+## Decided
+
+- 2026-10-23: GitHub-only release; no PyPI until the project has users.
+- 2026-10-23: FRED replaces Stooq for equity indices; the out-of-sample period starts in 2021.
+- 2026-10-24: CI runs on pull requests and manual dispatch only.
+
+## Proposed
+
+- The `esback` unit dependence (`scripts/r_fixtures/scale_repro.R`) is reported upstream with the G2'' issue.
+- Bootstrap ESR size and power are measured at alpha = 1% and at more DGPs, including a full-size boot profile (about 25 CPU-hours).
+- The study reports bootstrap ESR p-values, so its v3 column is no longer conservative.
+- The full-size study and Monte Carlo profiles have run on an idle machine, after a fresh re-timing.
+- `esr_backtest` supports constant forecasts in v3 through an intercept-only quantile equation, instead of returning `nan`.

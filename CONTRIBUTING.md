@@ -53,7 +53,7 @@ source line by line.
 
 ## Code
 
-- Python 3.11+, typed. Runtime dependencies: numpy, scipy, pandas, arch. Open an issue before
+- Python 3.11+, typed. Runtime dependencies: numpy, scipy, pandas, arch, threadpoolctl. Open an issue before
   adding one.
 - Match the surrounding style; ruff enforces the rest (line length 100).
 - Long computations must go through `tailcheck.checkpoint.UnitStore`, so they can resume

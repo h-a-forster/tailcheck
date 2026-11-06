@@ -1,7 +1,8 @@
 # tailcheck design
 
-Status: v0.1 plan, written at scaffold time (2026-10-23). The module stubs in `src/tailcheck/`
-follow this document. When code and this document disagree, fix one of them in the same commit.
+Status: the v0.1 design, written at scaffold time (2026-10-23); section 12 records where the
+implementation differs. When code and this document disagree, fix one of them in the same
+commit.
 
 ## 1. Goal and claims
 
@@ -28,7 +29,7 @@ conditional calibration test, a PyPI release.
 
 ## 2. Scope review (decisions taken at scaffold time)
 
-Implementation budget: about 5 hours of agent time. What was cut or changed, and why:
+What was cut or changed, and why:
 
 1. **Stooq replaced by FRED.** On 2026-10-23, `stooq.com/q/d/l/` returned an HTML page with a
    JavaScript bot check instead of CSV. That cannot be automated without bypassing bot
@@ -149,8 +150,8 @@ dropped and counted in `details["n_undefined"]`.
 
 Helper: `location_scale_simulator(mu, sigma, draw_standardized)`. For location-scale forecasts
 with a fixed standardized law, `r_t/e_t` and `I_t` are scale-free, so the null law of Z
-depends only on (law, alpha, T). The Monte Carlo runner exploits this to simulate the null
-once per cell. The library function does not assume it.
+depends only on (law, alpha, T). The Monte Carlo runner exploits this to share one null
+sample within a chunk of replications (section 6). The library function does not assume it.
 
 Reference values (`scripts/reference_values.py`, M = 200,000, seed 1, T = 250, alpha = 0.025;
 MC standard error of the 5% quantile about 0.003): 5% quantile of Z2 under H0 is -0.704
@@ -218,7 +219,9 @@ public default stays mathematically correct.
    alpha_tilde in (0, alpha) (alpha=0.025 gives 0.0096987404; 0.01 gives 0.0038469647).
    `b_q0 = QR(y, X_q, alpha)`, `b_e0 = QR(y, X_e, alpha_tilde)`. If g2 in {1,2,3} and
    `m = max(X_e b_e0) >= -0.1`, subtract `m + 0.1` from the ES intercept.
-4. Objective: mean loss. Return `+inf` if g2 in {1,2,3} and any `X_e b_e >= -0.01`.
+4. Objective: mean loss. Return `+inf` if g2 in {1,2,3} and any `X_e b_e >= -0.01`. Below
+   `sd(y) = 0.1`, the constants -0.1, 0.1, -0.01 of steps 3-4 are multiplied by `10 sd(y)`
+   (section 12).
 5. Nelder-Mead (`scipy.optimize.minimize`, maxiter 2000, `xatol=1e-8`, `fatol=1e-10`).
 6. Iterated local search: perturb the best point by `N(0, diag(se^2))`, with se the iid
    quantile-regression standard errors of the two starting fits; re-apply the intercept shift
@@ -318,6 +321,8 @@ defaults).
 | 2 auxiliary | r | 1, q | 1, e | b_e = (0, 1) | Wald, chi2(2) |
 | 3 strict intercept | r - e | 1, e | 1 | b_e0 = 0 | t; `p_less = Phi(t)`, `p_two = 2(1-Phi(abs(t)))` |
 
+Constant forecasts give `nan` with a reason in every version: the slopes are not identified.
+
 The primary p-value is two-sided for v1/v2 and one-sided ("less") for v3. In v3 a negative
 intercept means the realized ES of r - e is below 0, so risk is underestimated. `details`
 holds the coefficients, standard errors, both p-values, and the bootstrap p-values when
@@ -387,7 +392,8 @@ Formulas:
 `inputs` the hash does not cover (package version; for the study, the SHA-256 of each
 processed return series), a hash of the package source, the Python/numpy/scipy/arch versions
 and the start time. A mismatched config hash or `inputs` raises unless `--force-new`, so a
-resume never mixes units computed on different data. A changed source hash only warns (and
+resume never mixes units computed on different data. `--force-new` always deletes the finished
+units and starts over. A changed source hash only warns (and
 writes a `progress.log` line), because documentation edits should not invalidate a long run.
 The config hash excludes operational keys (`[run] workers`), so changing the worker count in
 the config does not block a resume; a manifest written under the older whole-config hash is
@@ -452,10 +458,10 @@ asset is done, because a finished unit is never recomputed.
 - **Commands**:
   `uv run tailcheck data fetch --config configs/study.toml`,
   `uv run tailcheck study run --config configs/study.toml --workers 4`,
-  `uv run tailcheck study report --config configs/study.toml` (writes `results/study-v1/` and
-  `REPORT.md`). Full size: the same commands with `configs/study_full.toml` (daily refits,
-  bootstrap ESR with B = 999; projected at roughly 20-30 CPU-hours, see the config header;
-  resumable).
+  `uv run tailcheck study report --config configs/study.toml` (writes `results/study-v1/`;
+  `REPORT.md` is written by hand). Full size: the same commands with
+  `configs/study_full.toml` (daily refits, bootstrap ESR with B = 999; re-timed at roughly
+  23-42 CPU-hours on an idle machine, see the config header; resumable).
 
 ## 6. Monte Carlo validation (M8)
 
@@ -494,8 +500,8 @@ small samples (Bayer and Dimitriadis 2022 recommend the bootstrap there). Reprod
 expected, not a bug.
 
 **Profiles.** `configs/mc_quick.toml` (default; at most 45 CPU-minutes, about 12 minutes on 4
-workers) and `configs/mc_full.toml` (projected at roughly 35-45 CPU-hours; see its
-header). Estimated quick budget:
+workers) and `configs/mc_full.toml` (re-timed at roughly 55-105 CPU-hours before its ESR cells were
+reduced; see its header). Estimated quick budget:
 ESR about 2,300 fits at about 1 s (Nelder-Mead ILS plus 4 LPs measured at about 1.3 s for
 n = 2000 at scaffold time); cheap tests about 120 s, since all cheap tests share each
 replication (the AS null was planned once per cell; it is now drawn once per chunk, see
@@ -627,7 +633,7 @@ tests/fixtures/r/    committed R outputs (JSON) and their inputs (CSV)
 results/             small committed derived results; REPORT.md at repo root
 ```
 
-Runtime dependencies: numpy, scipy, pandas and arch (arch brings statsmodels). The optional
+Runtime dependencies: numpy, scipy, pandas, arch (which brings statsmodels) and threadpoolctl. The optional
 `plot` extra adds matplotlib. Pinned in `uv.lock` (2026-10-23): numpy 2.5.4 (Python 3.12+) /
 2.4.6 (Python 3.11), scipy 1.18.1 / 1.17.1, pandas 3.1.0, arch 8.0.0, statsmodels 0.15.0,
 matplotlib 3.11.2. Licences: numpy BSD-3, scipy BSD-3, pandas BSD-3, arch NCSA,
@@ -755,5 +761,12 @@ Recorded when the plan above and the code differ:
 - **Config keys.** `[backtest] as_statistic` and `[esr] bootstrap` were removed (only Z2 is
   computed in the study; the bootstrap ESR Monte Carlo is a separate runner, section 6.1); `[run]
   workers` is now the default for `--workers`.
+- **Units.** The barrier and start margin of 4.3.2 are absolute in `esreg` and were here
+  too. With a daily sd around 1e-3 they exceed the distance from `max(y)` to the ES, the true
+  ES becomes infeasible and the ESR tests reject correct models. They now shrink with the data
+  below sd 0.1, so the coefficients are scale equivariant. Two nuisance steps have absolute
+  tolerances: the HiGHS LP (small scales) and the BFGS location-scale fit (above about 1e6).
+  `scale_of` divides by the sd when it lies outside [0.1, 1000]. Inside that band nothing
+  changes, so all committed results stand. Tested at 1e-7, 1e-3 and 1e7 times the example data.
 - **DGP name.** The `slow-vol` power DGP is called `unconditional`: it is constant-sigma t5
   forecasts on the `garch-t5` data, not a separate slowly varying volatility process.

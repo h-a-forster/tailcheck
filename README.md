@@ -39,8 +39,12 @@ Acerbi-Szekely tests (searched 2026-10-23).
   covariance used by `esback`'s default ESR tests and moved strict-ESR p-values by up to
   0.25 on the fixtures. tailcheck uses the correct formula. Minimal repro and analysis:
   [docs/esreg-covariance.md](docs/esreg-covariance.md).
-- **Size and power.** A Monte Carlo study reports the rejection rate of every test at the
-  sample sizes used in practice, with Wilson intervals. See [REPORT.md](REPORT.md).
+- **Units.** Percent, decimals and currency amounts give the same ESR statistic (tested at
+  1e-7, 1e-3 and 1e7 times the example data). `esback` 0.3.1 does not have this property: on
+  that data its strict-ESR p-value is 0.19 as is, 0.38 at 1/100 of the scale and 0.00 at
+  1/10,000 (`scripts/r_fixtures/scale_repro.R`).
+- **Size and power.** A Monte Carlo study reports the rejection rate of every backtest at
+  the sample sizes used in practice, with Wilson intervals. See [REPORT.md](REPORT.md).
 - **ESR v3: use the bootstrap.** The asymptotic one-sided intercept test (v3) is
   conservative, in tailcheck and in `esback` alike (about 0-2% rejections at 5% under the
   null; `esback` 0 of 250). With `n_boot > 0` the bootstrap test's size was estimated at
@@ -59,14 +63,16 @@ uv add git+https://github.com/h-a-forster/tailcheck
 uv tool install git+https://github.com/h-a-forster/tailcheck
 ```
 
-Python 3.11+. Runtime dependencies: numpy, scipy, pandas, arch.
+Python 3.11+. Runtime dependencies: numpy, scipy, pandas, arch, threadpoolctl.
 
 ## Quick start
 
 Conventions: returns `r`, VaR `q` and ES `e` are on the return scale, so left-tail forecasts
-are negative and `e <= q`. A VaR exceedance is `r <= q`. Every test returns a
+are negative and `e <= q`. A VaR exceedance is `r <= q`. The tests accept any unit; the
+forecasters and the study assume returns in percent. Every test returns a
 `BacktestResult` with `statistic`, `pvalue`, `alternative` and `details`; an undefined test
-(for example no exceedances) has `pvalue = nan` and a `details["reason"]`.
+(for example McNeil-Frey with fewer than 3 exceedances) has `pvalue = nan` and a
+`details["reason"]`.
 
 ```python
 import pandas as pd
