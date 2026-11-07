@@ -18,6 +18,7 @@
 
 ## Proposed
 
+- `_wilson` in `study/runner.py` can fall about 1e-17 outside [0, 1] at k = 0; clamp it the next time results are regenerated.
 - The `esback` unit dependence (`scripts/r_fixtures/scale_repro.R`) is reported upstream with the G2'' issue.
 - Bootstrap ESR size and power are measured at alpha = 1%, at more DGPs and on estimated forecasts, including a full-size boot profile (about 25 CPU-hours).
 - The two-sided v3 bootstrap p-value holds its size (8.1% at n = 1000), or `esr_backtest` stops returning it.
