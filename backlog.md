@@ -5,7 +5,6 @@
 ## Waiting on me
 
 - Branch `polish-2026-10-30` is merged through a pull request with a green first CI run (no workflow has ever run on GitHub).
-- Private vulnerability reporting is enabled, so the route in `SECURITY.md` works.
 - The repository description no longer claims Monte Carlo checks for FZ0 scoring and model confidence sets (text in `pyproject.toml`).
 - v0.1.0 is tagged, with `CHANGELOG.md` and the release notes carrying the tag date.
 - The `esreg` G2'' issue is filed (`docs/upstream/esreg-g2pp.md`).
