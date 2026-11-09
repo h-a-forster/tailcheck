@@ -18,3 +18,4 @@ runs/
 
 # R reference-fixture tooling (webR via Node)
 node_modules/
+backlog.md
