@@ -1,7 +1,8 @@
 name: CI
 
-# No push trigger: CI runs on pull requests and on manual dispatch.
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
