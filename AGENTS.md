@@ -31,8 +31,8 @@ and equity indices.
 - `esreg`/`esback` are GPL-3. Implement from the papers; use the R packages only as
   black-box oracles through `scripts/r_fixtures/` (webR). Do not translate their source.
 - Scratch files go in `tmp/` (gitignored). Do not create `.bak` copies; use git.
-- Do not push and do not create remote repositories; publishing is done separately after
-  review.
+- The repository is public on GitHub; pushes, tags and releases are done by the owner
+  after review.
 - Statistical honesty: report sizes, seeds, versions and intervals; adjust for multiple
   testing where DESIGN says so; never overstate. Before calling anything a library bug,
   produce a minimal repro and rule out an adapter mistake.
@@ -125,8 +125,8 @@ Done:
   (`scripts/r_fixtures/make_inputs.py`, `fixtures.R`, outputs in `tests/fixtures/r/`).
   QR matches R to 1e-14; our esreg loss <= R loss; vcov matches vcovA to 4e-6 (scl_N) /
   0.4% (scl_sp). Derivation and checks: `docs/esreg-covariance.md`.
-- **Confirmed esreg 0.6.2 discrepancy**: `G2_prime_prime(z, 1)` returns `-1/z^3` (correct:
-  `-2/z^3`); repro in `scripts/r_fixtures/g2pp_repro.R`. Affects misspec=TRUE covariance;
+- **esreg 0.6.2 bug** (esreg#17, fixed in 0.6.3): `G2_prime_prime(z, 1)` returns `-1/z^3`
+  (correct: `-2/z^3`); repro in `scripts/r_fixtures/g2pp_repro.R`. Affects misspec=TRUE covariance;
   private flag `_esreg_compat_g2pp` reproduces R. Default is the correct formula.
 - iid sparsity differs from esreg's by ~22% (ours verified unbiased in simulation); not
   used by the backtests.
@@ -200,7 +200,8 @@ Done:
   `docs/release-notes-0.1.0.md`; README per-resample cost corrected to the measured
   0.8-1.6 s (`results/retime-full.json`); esreg repro re-run (still 0.125 on 0.6.2, the
   current CRAN release and GitHub `main`); upstream issue drafted in
-  `docs/upstream/esreg-g2pp.md` (not filed).
+  `docs/upstream/esreg-g2pp.md` (filed 2026-11-06 as esreg#17, fixed in 0.6.3; see
+  `docs/upstream.md`).
 
 - Third audit (2026-11-06) fixed: the ESR tests depended on the unit of the data (absolute
   barrier, LP and BFGS tolerances; DESIGN 12); constant forecasts now give `nan` in every ESR

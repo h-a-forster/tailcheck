@@ -30,19 +30,22 @@ Acerbi-Szekely tests (searched 2026-10-23).
 - **Against R.** On committed fixtures from `esreg` 0.6.2 / `esback` 0.3.1 (run through
   webR): quantile regression agrees to 1e-14; our joint-regression loss is never above R's;
   the sandwich covariance agrees to 4e-6 (`scl_N`) and 0.4% (`scl_sp`) at R's coefficients;
-  all 36 `esr_backtest` p-values agree within 0.006 once one discrepancy in `esreg` is
+  all 36 `esr_backtest` p-values agree within 0.006 once one bug in `esreg` 0.6.2 is
   reproduced (next point). The test suite enforces these with some margin (1e-10, 1e-5 and
   1%, 0.01). The bootstrap ESR p-values are checked against hand-built resamples with known
   statistics and, distributionally, against `esback`'s bootstrap on a fixture.
-- **A discrepancy in `esreg` 0.6.2.** Its second derivative of the default G2 function
-  returns `-1/z^3` instead of `-2/z^3`. The term enters the misspecification-robust
+- **A bug in `esreg` 0.6.2, fixed in 0.6.3.** Its second derivative of the default G2
+  function returned `-1/z^3` instead of `-2/z^3`. The term enters the misspecification-robust
   covariance used by `esback`'s default ESR tests and moved strict-ESR p-values by up to
-  0.25 on the fixtures. tailcheck uses the correct formula. Minimal repro and analysis:
-  [docs/esreg-covariance.md](docs/esreg-covariance.md).
+  0.25 on the fixtures. tailcheck uses the correct formula. We reported it as
+  [esreg#17](https://github.com/BayerSe/esreg/issues/17); the maintainer fixed it in
+  `esreg` 0.6.3 (2026-11-09). The R fixtures here were generated with 0.6.2. Minimal repro
+  and analysis: [docs/esreg-covariance.md](docs/esreg-covariance.md).
 - **Units.** Percent, decimals and currency amounts give the same ESR statistic (tested at
   1e-7, 1e-3 and 1e7 times the example data). `esback` 0.3.1 does not have this property: on
   that data its strict-ESR p-value is 0.19 as is, 0.38 at 1/100 of the scale and 0.00 at
-  1/10,000 (`scripts/r_fixtures/scale_repro.R`).
+  1/10,000 (`scripts/r_fixtures/scale_repro.R`); reported as
+  [esreg#21](https://github.com/BayerSe/esreg/issues/21), open.
 - **Size and power.** A Monte Carlo study reports the rejection rate of every backtest at
   the sample sizes used in practice, with Wilson intervals. See [REPORT.md](REPORT.md).
 - **ESR v3: the one-sided bootstrap, where measured.** The asymptotic one-sided intercept test (v3) is
@@ -166,8 +169,8 @@ library; nothing is installed on the host), see `scripts/r_fixtures/` and
 - [docs/esreg-covariance.md](docs/esreg-covariance.md): covariance derivation and the R
   comparison.
 - [REPORT.md](REPORT.md): study and Monte Carlo results.
-- [docs/upstream/esreg-g2pp.md](docs/upstream/esreg-g2pp.md): draft upstream report of the
-  `esreg` discrepancy.
+- [docs/upstream.md](docs/upstream.md): issues filed upstream from these findings and what
+  became of them.
 
 ## Citation
 

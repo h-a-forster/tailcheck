@@ -1,6 +1,7 @@
 # Upstream issue draft: esreg `G2_prime_prime(z, 1)` returns `-1/z^3` instead of `-2/z^3`
 
-Status: draft, not filed. Target: <https://github.com/BayerSe/esreg/issues> (the CRAN page
+Status: filed 2026-11-06 as <https://github.com/BayerSe/esreg/issues/17>; fixed in esreg
+0.6.3 (2026-11-09). The draft as written follows. Target: <https://github.com/BayerSe/esreg/issues> (the CRAN page
 lists the maintainer's e-mail address as undeliverable). Checked 2026-10-30: esreg 0.6.2
 (published 2023-05-13) is still the current CRAN release, the GitHub `main` branch has the
 same code, and no existing issue mentions `G2_prime_prime`.

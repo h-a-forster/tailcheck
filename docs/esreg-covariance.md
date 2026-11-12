@@ -3,7 +3,7 @@
 This note derives the sandwich covariance used by `tailcheck.esreg.covariance`. It follows
 Dimitriadis and Bayer (2019), Theorem 2.6, and adds the terms that vanish only under correct
 specification. It also records how the implementation was checked against the R package
-`esreg` 0.6.2, and one discrepancy found in that package.
+`esreg` 0.6.2, and one bug found in that package (fixed in 0.6.3).
 
 ## Setup
 
@@ -100,7 +100,10 @@ fixture. In simulation (intercept only, normal data, 10 seeds each) our estimate
 0.05). We did not establish which estimator `esreg` uses. `iid` is not the default and is
 only forced for intercept-only fits, which the backtests do not use.
 
-## Discrepancy in esreg 0.6.2: G2'' for G2 type 1
+## Bug in esreg 0.6.2: G2'' for G2 type 1
+
+Reported as [esreg#17](https://github.com/BayerSe/esreg/issues/17) and fixed in esreg 0.6.3
+(2026-11-09).
 
 For `G2(z) = -1/z`, `G2'(z) = 1/z^2` and `G2''(z) = -2/z^3`. `esreg` 0.6.2 returns `-1/z^3`.
 Minimal repro (`scripts/r_fixtures/g2pp_repro.R`), using only esreg's own functions:

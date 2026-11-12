@@ -7,8 +7,9 @@ comes from those files; the commands that rebuild them are at the end.
 **Summary.**
 
 - The ES regression backtests reproduce the R reference implementation (`esback` 0.3.1) to
-  within 0.006 in p-value once one discrepancy in `esreg` 0.6.2 is reproduced. That
-  discrepancy (a wrong second derivative, `-1/z^3` instead of `-2/z^3`) changes strict-ESR
+  within 0.006 in p-value once one bug in `esreg` 0.6.2 is reproduced. That bug (a wrong
+  second derivative, `-1/z^3` instead of `-2/z^3`; reported as esreg#17 and fixed in esreg
+  0.6.3) changes strict-ESR
   p-values materially: by up to 0.25 on the reference fixtures and by up to 0.76 (median
   0.03) across the 50 study cells. tailcheck uses the correct formula.
 - Monte Carlo (231 cells, 296,280 replications). Acerbi-Szekely Z2 has a Wilson interval
@@ -118,7 +119,7 @@ Fixtures from `esreg`, `esback` and `quantreg`, generated with
 | `er_backtest` (B = 20,000) | one-sided p-values within 0.06 (the bootstrap is centred differently) |
 | iid sparsity | about 22% different from esreg's; ours is unbiased in simulation; not used by the backtests |
 
-**The esreg discrepancy.** `esreg:::G2_prime_prime(-2, 1)` returns 0.125; calculus and a
+**The esreg bug (fixed in esreg 0.6.3, [esreg#17](https://github.com/BayerSe/esreg/issues/17)).** `esreg:::G2_prime_prime(-2, 1)` returns 0.125; calculus and a
 finite difference of esreg's own `G2_prime_fun` both give 0.25 (repro:
 `scripts/r_fixtures/g2pp_repro.R`). The term only enters the misspecification-robust
 covariance that `esback` uses by default. We ruled out an error on our side: every other
@@ -206,7 +207,7 @@ The `iid-t5` cells look the same (Kupiec 10.1% at n = 250, 1%, 7.3% at n = 250, 
 - **Strict ESR.** Close to nominal or slightly oversized; with 200 replications the data
   cannot distinguish 5% from 8%. The esback G2'' variant rejects slightly more often in the
   same replications (6.0-9.0% against 5.5-8.0%; its n = 1000 interval, 5.8-13.8%, excludes 5%
-  while the correct-G2'' interval, 5.0-12.6%, just reaches it): the discrepancy changes
+  while the correct-G2'' interval, 5.0-12.6%, just reaches it): the esreg bug changes
   individual p-values (section 2.2) more than the rejection rate.
 - **ESR v3** is conservative: under the null the 5% quantile of its p-value is 0.10-0.18
   and its median 0.56-0.65. A separate null study (`scripts/esr_v3_null_se.py`, 200
