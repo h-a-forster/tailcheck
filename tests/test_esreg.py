@@ -256,11 +256,11 @@ def test_intercept_only_covariance_oracle(law: str) -> None:
 
 
 def test_v3_se_depends_on_the_internal_shift_only_through_misspec_terms() -> None:
-    """Pins the mechanism behind the narrower bootstrap T* (REPORT 3.1). The v3 fit
-    (intercept-only ES) does not depend on the constant max(y) subtracted from y before
-    fitting, and neither does its SE without the misspecification terms. With them it does:
-    they multiply the estimated F - alpha by the shifted quantile xi - max(y), as esreg's
-    vcovA does, and a bootstrap resample has its own max(y)."""
+    """The v3 fit (intercept-only ES) does not depend on the constant max(y) subtracted from
+    y before fitting, and neither does its SE without the misspecification terms. With them
+    it does, as in esreg's vcovA: they multiply the estimated F - alpha by the shifted
+    quantile xi - max(y). The dependence is not what narrows the bootstrap T* (REPORT 3.1,
+    arm base_fixshift); this pins the covariance form only."""
     import dataclasses
 
     from tailcheck.montecarlo.dgp import simulate

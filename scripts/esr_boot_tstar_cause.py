@@ -12,20 +12,27 @@ differ only by the standard error:
 - ``scl_N``: the location-scale truncated-normal variance;
 - ``iid_sp``: ``iid`` sparsity with ``scl_sp``;
 - ``emp``: the plain influence-function SE of the ES intercept, ``sd(psi) / sqrt(n)`` with
-  ``psi = xi - (xi - y) 1{y <= xi} / alpha`` (the v3 FOC; no smoothing, no model).
+  ``psi = xi - (xi - y) 1{y <= xi} / alpha`` (the v3 FOC; no smoothing, no model);
+- ``base_fixshift``: ``base``, but every fit uses the sample's internal shift ``max(y)``
+  (a resample that misses the sample maximum otherwise has a smaller one). This is the
+  counterfactual for the shift dependence of the misspecification terms.
+
+Each fit also records ``shift`` (its ``max(y)``) and ``d_mean``, the mean of ``cdf - alpha``
+that the misspecification terms of ``base`` use.
 
 Each arm also gets the warp-speed size of the bootstrap test at 5% (one-sided "less", as
 ``esr_backtest`` reports it, and two-sided on ``|T|``) from the pooled ``T*`` of its design,
 and ``sd(T*) / sd(T0)`` relative to ``base`` with a paired interval. ``shift_sensitivity``
 refits 8 fresh samples and moves the constant subtracted from ``y`` before fitting
-(``max(y)``) by +5: the v3 estimate does not depend on it, so neither should its SE.
+(``max(y)``) by +5: the v3 estimate does not depend on it, and the SE does only through
+the misspecification terms (``base_fixshift`` measures whether that matters for ``T*``).
 ``tail_mean_baseline`` is the same comparison without any regression: the bootstrap-t of the
 plain empirical ES (mean of the ``ceil(n alpha)`` smallest values, delta-method SE) on iid
 data, to show whether a narrower ``T*`` is generic to tail means.
 
 Designs: ``garch-t5`` (the cell itself) and ``garch-normal`` (same GARCH, normal shocks).
 
-    uv run python scripts/esr_boot_tstar_cause.py --workers 4   # 72 CPU-minutes, 18 min wall
+    uv run python scripts/esr_boot_tstar_cause.py --workers 4   # 118 CPU-minutes, 28 min wall
 
 Replications go through ``UnitStore`` in ``runs/esr-boot-tstar-cause/`` (rerun to resume);
 the summary goes to ``results/mc-esr-boot/tstar_cause.json``.
@@ -53,11 +60,14 @@ SE_ARMS: dict[str, tuple[str, str, bool]] = {
     "scl_N": ("nid", "scl_N", True),
     "iid_sp": ("iid", "scl_sp", True),
 }
-RUN = Path("runs/esr-boot-tstar-cause")
+RUN = Path("runs/esr-boot-tstar-cause-v3")
 OUT = Path("results/mc-esr-boot/tstar_cause.json")
 
 
-def _ses(y: Any, xq: Any, seed: int) -> dict[str, float]:
+def _ses(y: Any, xq: Any, seed: int, shift: float | None = None) -> dict[str, float]:
+    """SEs of one fit; ``shift`` sets the internal shift of the ``base_fixshift`` arm."""
+    import dataclasses
+
     from tailcheck.esr_backtest import _fit
     from tailcheck.esreg.covariance import vcov_details
 
@@ -67,6 +77,14 @@ def _ses(y: Any, xq: Any, seed: int) -> dict[str, float]:
     except (ValueError, RuntimeError, np.linalg.LinAlgError):
         return {"b": math.nan}
     out["b"] = float(fit.coef_e[0])
+    out["shift"] = float(fit.y_shift)
+    fixed = dataclasses.replace(fit, y_shift=fit.y_shift if shift is None else shift)
+    try:
+        cov, info = vcov_details(fixed, "nid", "scl_sp", True)
+        out["base_fixshift"] = math.sqrt(cov[2, 2]) if cov[2, 2] > 0 else math.nan
+        out["d_mean"] = float(np.mean(info["cdf"]) - ALPHA)
+    except (ValueError, RuntimeError, np.linalg.LinAlgError, ZeroDivisionError):
+        out["base_fixshift"] = out["d_mean"] = math.nan
     for arm, (sparsity, sigma, misspec) in SE_ARMS.items():
         try:
             cov, _ = vcov_details(fit, sparsity, sigma, misspec)  # type: ignore[arg-type]
@@ -106,7 +124,7 @@ def unit(arg: dict[str, Any]) -> dict[str, object]:
         seed = int(rng.integers(1 << 31))
         idx = rng.integers(0, N, N)
         full = _ses(y, e, seed)
-        boot = _ses(y[idx], e[idx], seed + 1)
+        boot = _ses(y[idx], e[idx], seed + 1, full.get("shift"))
         rows.append(
             {
                 **{f"full_{k}": v for k, v in full.items()},
@@ -156,7 +174,22 @@ def summarise(rows: list[dict[str, float]]) -> dict[str, Any]:
         "sd_b_hat": round(float(a["full_b"].std(ddof=1)), 4),
         "sd_bstar_minus_b_hat": round(float(d.std(ddof=1)), 4),
     }
-    for arm in [*SE_ARMS, "emp"]:
+    arms = [*SE_ARMS, "emp", "base_fixshift"]
+    gap = a["full_shift"] - a["boot_shift"]
+    missed = gap > 0
+    change = np.abs(a["boot_base"] / a["boot_base_fixshift"] - 1)[missed]
+    out["shift"] = {
+        "resample_misses_max": round(float(missed.mean()), 4),
+        "median_gap_when_missed": round(float(np.median(gap[missed])), 4),
+        "abs_se_change_when_missed_median_p90": [
+            round(float(q), 4) for q in np.quantile(change, [0.5, 0.9])
+        ],
+    }
+    out["d_mean"] = {
+        "sample": round(float(a["full_d_mean"].mean()), 6),
+        "resample": round(float(a["boot_d_mean"].mean()), 6),
+    }
+    for arm in arms:
         se0, se1 = a[f"full_{arm}"], a[f"boot_{arm}"]
         t0, ts = a["full_b"] / se0, d / se1
         out[arm] = {
@@ -180,7 +213,7 @@ def summarise(rows: list[dict[str, float]]) -> dict[str, Any]:
         return ts[idx].std(axis=1, ddof=1) / t0[idx].std(axis=1, ddof=1)
 
     base_r = ratio(base_t0, base_ts)
-    for arm in [*SE_ARMS, "emp"]:
+    for arm in arms:
         if arm == "base":
             continue
         rel = ratio(a["full_b"] / a[f"full_{arm}"], d / a[f"boot_{arm}"]) / base_r

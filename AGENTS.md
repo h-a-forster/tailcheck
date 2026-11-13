@@ -211,11 +211,12 @@ Done:
   `OPENBLAS_NUM_THREADS=1`: with it the three bootstrap fixtures take about 4 minutes each;
   without it the run did not finish in 14.5 minutes.
 
-- T* cause settled (2026-11-13, `scripts/esr_boot_tstar_cause.py`, REPORT 3.1): the v3
-  bootstrap statistic is narrower because of the default (model-based, misspec) standard
-  error, whose misspec terms depend on `max(y)`; not the refit, resampling or serial
-  dependence, and not a tailcheck bug (it reproduces esreg). Default covariance unchanged;
-  the two-sided v3 bootstrap (8.1%) stays not recommended. Alternatives tried: backlog.
+- T* cause (2026-11-13, `scripts/esr_boot_tstar_cause.py`, REPORT 3.1): the v3 bootstrap
+  statistic is narrower because of the default (model-based, misspec) standard error; not the
+  refit, resampling or serial dependence, and not a tailcheck bug (it reproduces esreg). Not
+  the `max(y)` shift either: the `base_fixshift` arm leaves it unchanged. Which part of the
+  misspec terms acts is open. Default covariance unchanged; the two-sided v3 bootstrap (8.1%)
+  stays not recommended.
 
 Re-running anything: resume from `runs/<name>/units/`; delete a run directory only to start
 over.

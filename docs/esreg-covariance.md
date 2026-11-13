@@ -132,7 +132,7 @@ the estimated `F - a`, so it is noise around 0 when the model is right. Its othe
 the bare `xi` in the misspecification parts of `C_21` and `C_22`, is the quantile on the
 shifted scale, about `-max(y)` for G2 types 1-3. Because `E[y I | x] = a eta` is not shift
 covariant, the SE then depends on `max(y)` even where the estimate does not (intercept-only
-ES), which is why the bootstrap statistic of ESR v3 is narrower than the observed one (REPORT
-3.1). tailcheck uses the
+ES). That dependence is small and is not why the bootstrap statistic of ESR v3 is narrower
+than the observed one: fixing the shift leaves it unchanged (REPORT 3.1). tailcheck uses the
 mathematically correct `-2/z^3` by default. The Monte Carlo (REPORT.md) reports the size of
 strict ESR under both variants so the practical effect is visible.
