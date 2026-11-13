@@ -255,6 +255,27 @@ def test_intercept_only_covariance_oracle(law: str) -> None:
     assert got[0, 1] == pytest.approx(sig[0, 1], rel=0.15)
 
 
+def test_v3_se_depends_on_the_internal_shift_only_through_misspec_terms() -> None:
+    """Pins the mechanism behind the narrower bootstrap T* (REPORT 3.1). The v3 fit
+    (intercept-only ES) does not depend on the constant max(y) subtracted from y before
+    fitting, and neither does its SE without the misspecification terms. With them it does:
+    they multiply the estimated F - alpha by the shifted quantile xi - max(y), as esreg's
+    vcovA does, and a bootstrap resample has its own max(y)."""
+    import dataclasses
+
+    from tailcheck.montecarlo.dgp import simulate
+
+    s = simulate("garch-t5", 1000, 0.025, np.random.default_rng(3))
+    fit = esreg(s.r - s.e, s.e, None, 0.025, early_stopping=0)
+    moved = dataclasses.replace(fit, y_shift=fit.y_shift + 5.0)
+
+    def se(f: ESRegFit, misspec: bool) -> float:
+        return float(np.sqrt(vcov_details(f, "nid", "scl_sp", misspec)[0][2, 2]))
+
+    assert se(moved, False) == pytest.approx(se(fit, False), rel=1e-6)  # numerics only
+    assert se(moved, True) / se(fit, True) - 1 > 0.05  # 12.7% on this sample
+
+
 def test_intercept_only_forces_iid_ind() -> None:
     y = np.random.default_rng(6).standard_normal(2000)
     fit = esreg(y, None, None, 0.025, early_stopping=0)

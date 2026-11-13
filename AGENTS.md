@@ -211,10 +211,11 @@ Done:
   `OPENBLAS_NUM_THREADS=1`: with it the three bootstrap fixtures take about 4 minutes each;
   without it the run did not finish in 14.5 minutes.
 
-- T* diagnostic (2026-11-07, `scripts/esr_boot_tstar.py`, REPORT 3.1): the v3 narrowing is
-  not the `early_stopping` mismatch (ratio 0.9999) nor repeated rows; it is in the upper tail,
-  so `_bootstrap` is unchanged and the two-sided v3 bootstrap (8.1%) is not recommended. The
-  stored `mc-esr-boot` statistics still reproduce exactly on the current code (one chunk).
+- T* cause settled (2026-11-13, `scripts/esr_boot_tstar_cause.py`, REPORT 3.1): the v3
+  bootstrap statistic is narrower because of the default (model-based, misspec) standard
+  error, whose misspec terms depend on `max(y)`; not the refit, resampling or serial
+  dependence, and not a tailcheck bug (it reproduces esreg). Default covariance unchanged;
+  the two-sided v3 bootstrap (8.1%) stays not recommended. Alternatives tried: backlog.
 
 Re-running anything: resume from `runs/<name>/units/`; delete a run directory only to start
 over.

@@ -1,7 +1,8 @@
 # tailcheck v0.1 report: validation and forecaster study
 
 Generated 2026-10-23 and 2026-10-24 from the committed files under `results/`; section 3.1
-dates from 2026-10-24 and the units note in section 2.2 from 2026-11-06. Every number below
+dates from 2026-10-24 (its T* paragraph from 2026-11-13) and the units note in section 2.2
+from 2026-11-06. Every number below
 comes from those files; the commands that rebuild them are at the end.
 
 **Summary.**
@@ -28,8 +29,10 @@ comes from those files; the commands that rebuild them are at the end.
   of 250 null samples too. In the one DGP measured (`garch-t5`, true forecasts, alpha = 2.5%,
   n = 1000 and 2000) the bootstrap restores the size of the one-sided v3 test (4.3% in 1,000
   null replications, interval 2.2-6.1%) and nearly doubles its power at n = 1000 (0.65
-  against 0.35-0.37). Its two-sided p-value is oversized there (8.1%, interval 5.8-10.9%), and
-  alpha = 1%, other DGPs and estimated forecasts are unmeasured. The strict ESR test is mildly
+  against 0.35-0.37). Its two-sided p-value is oversized there (8.1%, interval 5.8-10.9%)
+  because the default standard error behaves differently on resamples than on samples (its
+  misspecification terms depend on max(y)); alpha = 1%, other DGPs and estimated forecasts are
+  unmeasured. The strict ESR test is mildly
   oversized at n = 1000 asymptotically (7.3%) and 6.2% with the bootstrap (section 3.1).
 - In the study (5 assets x 5 forecasters x 2 levels, out of sample 2021-01 to 2026-09), 11 of
   50 strict ESR tests reject at 5% before adjustment, 6 after Benjamini-Hochberg and 4 after
@@ -301,23 +304,47 @@ estimated).
   5%) and 7.2% at n = 2000 (4.5-11.8%), against 6.7% and 6.3% for the asymptotic two-sided test
   on the same replications. These two rates come from the stored statistics of the cells
   above. Do not use the two-sided value.
-- **Why T* is narrower** (`scripts/esr_boot_tstar.py`, `results/mc-esr-boot/tstar_diagnostic.json`;
-  400 null replications of the v3 n = 1000 cell, seed 20261107, about 26 CPU-minutes, with
-  every option applied to the same resample). The refit's `early_stopping=0`, against 10 for
-  the full-sample fit, is not the cause: refitting with 10 leaves sd(T*) unchanged (ratio
-  0.9999, interval 0.9996-1.0001; correlation 0.999998). The local searches improve the loss
-  in 15% of resamples and T* moves by less than 0.009 in 99%, so the option stays at 0.
-  Repeated rows are not the cause either: noise of 5% of sd(y) on the resampled `y` gives a
-  ratio of 1.02 (0.97-1.07). Nor is the numerator: sd(b* - b_hat) / sd(b_hat) is 0.97
-  (0.84-1.12). The denominator is where they differ. Across samples the estimate and its SE
-  correlate at -0.49 (-0.70 to -0.29), the asymmetry of section 3 that gives T0 its long
-  upper tail; within a sample, b* - b_hat and log(SE*/SE) correlate at only -0.24 (-0.39 to
-  -0.10), and the median SE* is 6% above the median SE. So the resampling reproduces this
-  dependence only in part. That is the likely cause, not a proven one. Serial dependence, which
-  the row bootstrap discards, is not needed for the mismatch but is not excluded: with nearly
-  independent rows the ratio is 0.91 (0.79-1.05), which covers both 0.85 and 1, and the
-  correlations are -0.38 and -0.33. This study ran v3 only, so optimiser noise in v1 (four
-  coefficients; flat loss, see below) is unmeasured.
+- **Why T* is narrower: the standard error** (settled 2026-11-13;
+  `scripts/esr_boot_tstar_cause.py`, `results/mc-esr-boot/tstar_cause.json`; 800 null
+  replications of the v3 n = 1000 cell and 400 of the same GARCH with normal shocks, seed
+  20261113, 72 CPU-minutes on a shared machine; each replication fits one sample and one
+  resample, and the arms differ only in the SE used for T0 and T*). An earlier study (`scripts/esr_boot_tstar.py`,
+  `results/mc-esr-boot/tstar_diagnostic.json`, 400 replications) ruled out the refit's
+  `early_stopping=0` (refitting with 10 gives a ratio of 0.9999, interval 0.9996-1.0001),
+  repeated rows (noise of 5% of sd(y) on the resampled `y`: 1.02, 0.97-1.07) and the numerator
+  (sd(b* - b_hat) / sd(b_hat) 0.97, 0.84-1.12). That leaves the denominator, and three results
+  settle it:
+  1. A narrower T* is not generic to tail means. The bootstrap-t of the plain empirical ES on
+     iid data, with the same 25 tail observations, has sd(T*) / sd(T0) of 1.00 (0.96-1.04) on
+     normal data and 1.00 (0.96-1.05) on t5.
+  2. Studentizing T0 and T* with the plain influence-function SE of the ES intercept,
+     sd(xi - (xi - y) 1{y <= xi} / alpha) / sqrt(n), gives a ratio of 0.98 (0.88-1.10) against
+     0.88 (0.80-0.98) with the package default; paired, the gain is 1.11 (1.03-1.19). The
+     two-sided warp-speed size falls from 8.9% (5.9-12.1%) to 6.0% (3.6-8.8%), but the one-sided
+     size falls too, from 5.0% (2.6-8.0%) to 3.1% (1.8-5.4%). With normal shocks the ratios are
+     0.90 (0.80-1.01) and 0.99 (0.88-1.10), paired gain 1.10 (1.02-1.19).
+  3. The default SE has a heavy upper tail that the plain one lacks. Its root mean square is
+     1.48 times sd(b_hat) across samples and 4.6 times sd(b* - b_hat) across resamples (1.02
+     and 1.01 for the plain SE). Most of that comes from the misspecification terms
+     (`misspec=True`, the esback default; without them 1.05 and 1.06). As in esreg's `vcovA`,
+     these terms multiply the estimated F - alpha by the quantile on the internally shifted
+     scale, xi - max(y), so the SE depends on max(y) although the v3 estimate does not: adding
+     5 to the shift moves the default SE by -0.04% to 18% across 8 samples and the SE without
+     these terms not at all (`test_v3_se_depends_on_the_internal_shift_only_through_misspec_terms`).
+     A resample misses the sample maximum in about 37% of draws. Removing the terms alone moves
+     the ratio only to 0.92 (paired 1.045, 0.985-1.10), so the smoothed truncated variance and
+     the sparsity estimate in the default SE contribute too; swapping only the truncated-variance
+     estimator (`ind`, `scl_N`) or the sparsity (`iid`) changes nothing (paired 0.98-1.00).
+
+  So T* is narrower because the model-based SE relates to the estimate differently on a
+  resample than on a sample; the resampling and refitting are not at fault (they match esback's
+  B = 499 fixture, section 2.2). This is not a tailcheck bug: the covariance reproduces esreg's.
+  A shift-covariant form of the misspecification terms (E[y 1{y <= xi} | x] = F eta instead of
+  esreg's alpha eta) removed the shift dependence but was not positive definite in 6 of 240
+  resamples and made T* too wide (ratio 1.25, 0.91-1.68; a partial run, not kept), so the
+  default covariance is unchanged. Heavy tails are not needed for the mismatch (normal shocks
+  above), and the mechanism needs no serial dependence (nearly independent rows gave 0.91,
+  0.79-1.05, in the earlier study).
 - **Power of v3 nearly doubles** at the corrected size: 0.65 against 0.37 (understated
   scale) and 0.35 (normal tails) for the asymptotic test, at n = 1000.
 - **Strict ESR (v1).** The asymptotic test is mildly oversized at n = 1000 (7.3%, interval
@@ -329,9 +356,9 @@ estimated).
   barely excluding 5%.
 - **Scope.** The bootstrap recommendation covers the one-sided v3 test at the 5% level, on
   `garch-t5` with true forecasts, alpha = 2.5%, n = 1000 and 2000 (power at n = 1000 only). It
-  rests on the agreement of one quantile that the study shows but does not explain, so it does
-  not carry over to alpha = 1% (four of the six BH rejections in section 4 are 1% cells with few
-  exceedances), to other DGPs, to estimated forecasts or to other levels.
+  rests on the lower 5% quantiles of T0 and T* agreeing while their distributions differ (see
+  above), so it does not carry over to alpha = 1% (four of the six BH rejections in section 4
+  are 1% cells with few exceedances), to other DGPs, to estimated forecasts or to other levels.
 
 **esback directly.** `scripts/esback_null/` ran `esback::esr_backtest` (version 0.3.1, esreg
 0.6.2, R 4.6.0 in webR; asymptotic, package defaults) on 250 `garch-t5` null samples
@@ -516,6 +543,8 @@ uv run tailcheck mc report    --config configs/mc_quick.toml
 # section 3.1 (about 5 CPU-hours; sessions of at most --max-minutes, rerun to resume)
 uv run tailcheck mc boot-run    --config configs/mc_esr_boot.toml --workers 3 --max-minutes 36
 uv run tailcheck mc boot-report --config configs/mc_esr_boot.toml
+# section 3.1, why T* is narrower (72 CPU-minutes; rerun to resume)
+uv run python scripts/esr_boot_tstar_cause.py --workers 4
 # esback on null data (Node 20+; steps in scripts/esback_null/esback_null.py)
 ```
 
