@@ -1,0 +1,615 @@
+{
+  "complete": true,
+  "expected": 12680,
+  "done": 12680,
+  "cells": 815,
+  "total_replications": 4036400,
+  "distorted_size_cells": [
+    {
+      "test": "christoffersen_cc",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0068
+    },
+    {
+      "test": "christoffersen_cc",
+      "dgp": "garch-t5",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.0165
+    },
+    {
+      "test": "christoffersen_cc",
+      "dgp": "garch-t5",
+      "n": 5000,
+      "alpha": 0.025,
+      "rate": 0.0836
+    },
+    {
+      "test": "christoffersen_cc",
+      "dgp": "iid-normal",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.008
+    },
+    {
+      "test": "christoffersen_cc",
+      "dgp": "iid-normal",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.0152
+    },
+    {
+      "test": "christoffersen_cc",
+      "dgp": "iid-normal",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.0263
+    },
+    {
+      "test": "christoffersen_cc",
+      "dgp": "iid-normal",
+      "n": 5000,
+      "alpha": 0.025,
+      "rate": 0.0844
+    },
+    {
+      "test": "christoffersen_cc",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0059
+    },
+    {
+      "test": "christoffersen_cc",
+      "dgp": "iid-t5",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.0146
+    },
+    {
+      "test": "christoffersen_cc",
+      "dgp": "iid-t5",
+      "n": 5000,
+      "alpha": 0.025,
+      "rate": 0.0804
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0119
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.025,
+      "rate": 0.0152
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.05,
+      "rate": 0.0172
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.014
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 500,
+      "alpha": 0.025,
+      "rate": 0.0157
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.0192
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 1000,
+      "alpha": 0.025,
+      "rate": 0.0181
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 1000,
+      "alpha": 0.05,
+      "rate": 0.0807
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 2000,
+      "alpha": 0.01,
+      "rate": 0.014
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "garch-t5",
+      "n": 5000,
+      "alpha": 0.01,
+      "rate": 0.0169
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-normal",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0134
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-normal",
+      "n": 250,
+      "alpha": 0.025,
+      "rate": 0.0148
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-normal",
+      "n": 250,
+      "alpha": 0.05,
+      "rate": 0.0163
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-normal",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.0136
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-normal",
+      "n": 500,
+      "alpha": 0.025,
+      "rate": 0.0161
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-normal",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.0182
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-normal",
+      "n": 1000,
+      "alpha": 0.025,
+      "rate": 0.0207
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-normal",
+      "n": 1000,
+      "alpha": 0.05,
+      "rate": 0.0855
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-normal",
+      "n": 2000,
+      "alpha": 0.01,
+      "rate": 0.0189
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-normal",
+      "n": 5000,
+      "alpha": 0.01,
+      "rate": 0.0171
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0134
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.025,
+      "rate": 0.0175
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.05,
+      "rate": 0.0174
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.0146
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 500,
+      "alpha": 0.025,
+      "rate": 0.0143
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.0187
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 1000,
+      "alpha": 0.025,
+      "rate": 0.0193
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 1000,
+      "alpha": 0.05,
+      "rate": 0.0856
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 2000,
+      "alpha": 0.01,
+      "rate": 0.0143
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 2000,
+      "alpha": 0.025,
+      "rate": 0.0254
+    },
+    {
+      "test": "christoffersen_ind",
+      "dgp": "iid-t5",
+      "n": 5000,
+      "alpha": 0.01,
+      "rate": 0.0179
+    },
+    {
+      "test": "dq",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0895
+    },
+    {
+      "test": "dq",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.025,
+      "rate": 0.0783
+    },
+    {
+      "test": "dq",
+      "dgp": "garch-t5",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.1628
+    },
+    {
+      "test": "dq",
+      "dgp": "garch-t5",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.0997
+    },
+    {
+      "test": "dq",
+      "dgp": "garch-t5",
+      "n": 2000,
+      "alpha": 0.01,
+      "rate": 0.084
+    },
+    {
+      "test": "dq",
+      "dgp": "garch-t5",
+      "n": 5000,
+      "alpha": 0.01,
+      "rate": 0.0785
+    },
+    {
+      "test": "dq",
+      "dgp": "iid-normal",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0946
+    },
+    {
+      "test": "dq",
+      "dgp": "iid-normal",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.1743
+    },
+    {
+      "test": "dq",
+      "dgp": "iid-normal",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.1115
+    },
+    {
+      "test": "dq",
+      "dgp": "iid-normal",
+      "n": 2000,
+      "alpha": 0.01,
+      "rate": 0.088
+    },
+    {
+      "test": "dq",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0907
+    },
+    {
+      "test": "dq",
+      "dgp": "iid-t5",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.1792
+    },
+    {
+      "test": "dq",
+      "dgp": "iid-t5",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.1121
+    },
+    {
+      "test": "dq",
+      "dgp": "iid-t5",
+      "n": 2000,
+      "alpha": 0.01,
+      "rate": 0.0817
+    },
+    {
+      "test": "dq",
+      "dgp": "iid-t5",
+      "n": 5000,
+      "alpha": 0.01,
+      "rate": 0.0786
+    },
+    {
+      "test": "esr_v1",
+      "dgp": "garch-t5",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.117
+    },
+    {
+      "test": "esr_v1",
+      "dgp": "garch-t5",
+      "n": 500,
+      "alpha": 0.025,
+      "rate": 0.086
+    },
+    {
+      "test": "esr_v1_esback_g2pp",
+      "dgp": "garch-t5",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.098
+    },
+    {
+      "test": "esr_v2",
+      "dgp": "garch-t5",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.117
+    },
+    {
+      "test": "esr_v2",
+      "dgp": "garch-t5",
+      "n": 500,
+      "alpha": 0.025,
+      "rate": 0.086
+    },
+    {
+      "test": "esr_v3",
+      "dgp": "garch-t5",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.003
+    },
+    {
+      "test": "esr_v3",
+      "dgp": "garch-t5",
+      "n": 500,
+      "alpha": 0.025,
+      "rate": 0.0
+    },
+    {
+      "test": "esr_v3",
+      "dgp": "garch-t5",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.001
+    },
+    {
+      "test": "esr_v3",
+      "dgp": "garch-t5",
+      "n": 1000,
+      "alpha": 0.025,
+      "rate": 0.006
+    },
+    {
+      "test": "esr_v3",
+      "dgp": "garch-t5",
+      "n": 2000,
+      "alpha": 0.01,
+      "rate": 0.004
+    },
+    {
+      "test": "esr_v3",
+      "dgp": "garch-t5",
+      "n": 2000,
+      "alpha": 0.025,
+      "rate": 0.008
+    },
+    {
+      "test": "esr_v3",
+      "dgp": "garch-t5",
+      "n": 5000,
+      "alpha": 0.01,
+      "rate": 0.008
+    },
+    {
+      "test": "kupiec",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0916
+    },
+    {
+      "test": "kupiec",
+      "dgp": "iid-normal",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0975
+    },
+    {
+      "test": "kupiec",
+      "dgp": "iid-normal",
+      "n": 250,
+      "alpha": 0.025,
+      "rate": 0.0752
+    },
+    {
+      "test": "kupiec",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0963
+    },
+    {
+      "test": "kupiec",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.025,
+      "rate": 0.0753
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0101
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "garch-t5",
+      "n": 250,
+      "alpha": 0.025,
+      "rate": 0.0179
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "garch-t5",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.015
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "garch-t5",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.0233
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "iid-normal",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.015
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "iid-normal",
+      "n": 250,
+      "alpha": 0.025,
+      "rate": 0.024
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "iid-normal",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.022
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.01,
+      "rate": 0.0089
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "iid-t5",
+      "n": 250,
+      "alpha": 0.025,
+      "rate": 0.0163
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "iid-t5",
+      "n": 500,
+      "alpha": 0.01,
+      "rate": 0.0162
+    },
+    {
+      "test": "mcneil_frey",
+      "dgp": "iid-t5",
+      "n": 1000,
+      "alpha": 0.01,
+      "rate": 0.0206
+    }
+  ],
+  "config_hash": "3de88eab00578b69",
+  "run_manifest": {
+    "config_hash": "3de88eab00578b69",
+    "inputs": {
+      "tailcheck": "0.1.0"
+    },
+    "source_hash": "cd181ead9b614812",
+    "versions": {
+      "python": "3.13.18",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1",
+      "pandas": "3.1.0",
+      "arch": "8.0.0",
+      "tailcheck": "0.1.0"
+    },
+    "started": "2026-11-13T03:34:10+00:00",
+    "platform": "linux"
+  }
+}

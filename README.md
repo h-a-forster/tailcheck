@@ -47,7 +47,9 @@ Acerbi-Szekely tests (searched 2026-10-23).
   1/10,000 (`scripts/r_fixtures/scale_repro.R`); reported as
   [esreg#21](https://github.com/BayerSe/esreg/issues/21), open.
 - **Size and power.** A Monte Carlo study reports the rejection rate of every backtest at
-  the sample sizes used in practice, with Wilson intervals. See [REPORT.md](REPORT.md).
+  the sample sizes used in practice, with Wilson intervals. See [REPORT.md](REPORT.md). In
+  the full profile (1,000 null replications per cell) the asymptotic strict ESR test is
+  oversized for n <= 2000 (6.8-11.7% at 5%) and near nominal at n = 5000.
 - **ESR v3: the one-sided bootstrap, where measured.** The asymptotic one-sided intercept test (v3) is
   conservative, in tailcheck and in `esback` alike (about 0-2% rejections at 5% under the
   null; `esback` 0 of 250). With `n_boot > 0` the bootstrap test's size was estimated at
@@ -146,8 +148,9 @@ uv run tailcheck mc boot-report --config configs/mc_esr_boot.toml
 ```
 
 Every long run is checkpointed per unit under `runs/<name>/units/` and resumes where it
-stopped; progress goes to `runs/<name>/progress.log`. Full-size configurations
-(`configs/study_full.toml`, `configs/mc_full.toml`) take many CPU-hours.
+stopped; progress goes to `runs/<name>/progress.log`. Full-size configurations take many
+CPU-hours: `configs/mc_full.toml` took 19 on a Linux machine (results in `results/mc-full/`,
+REPORT section 3.0); `configs/study_full.toml` has not been run.
 
 ## How to validate
 

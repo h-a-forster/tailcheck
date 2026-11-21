@@ -2,7 +2,8 @@
 
 Generated 2026-10-23 and 2026-10-24 from the committed files under `results/`; section 3.1
 dates from 2026-10-24 (its T* paragraph from 2026-11-13) and the units note in section 2.2
-from 2026-11-06. Every number below
+from 2026-11-06; the full-profile Monte Carlo (section 3.0) was run 2026-11-13 and added
+2026-11-21. Every number below
 comes from those files; the commands that rebuild them are at the end.
 
 **Summary.**
@@ -34,6 +35,16 @@ comes from those files; the commands that rebuild them are at the end.
   inside that SE, is only partly known); alpha = 1%, other DGPs and estimated forecasts are
   unmeasured. The strict ESR test is mildly
   oversized at n = 1000 asymptotically (7.3%) and 6.2% with the bootstrap (section 3.1).
+- **Full-profile Monte Carlo** (815 cells, 4,036,400 replications, 1,000 null replications per
+  ESR cell; section 3.0) supersedes the quick run's ESR size statements. The asymptotic strict
+  ESR test is oversized for n <= 2000: 11.7% [9.9, 13.8] at n = 500, alpha = 1%; 8.6% at
+  n = 500, 2.5%; 6.8-8.2% at n = 1000-2000 (6 of 8 intervals exclude 5%). Only at n = 5000 is it
+  near nominal (4.1-4.2%, intervals cover 5%). The quick run could not tell this apart from 5%.
+  ESR v3 is conservative in all 8 cells (0-2.2%), moving towards 5% only slowly with n.
+  The other tests keep the quick run's pattern; DQ stays oversized at alpha = 1% even at
+  n = 5000 (7.4-7.9%). Christoffersen independence is undersized everywhere only at alpha = 1%;
+  at 2.5% it is undersized up to n = 2000 but oversized at n = 5000 (6.5-7.1%, all three
+  intervals exclude 5%), and at 5% it is oversized in some cells (up to 8.6%).
 - In the study (5 assets x 5 forecasters x 2 levels, out of sample 2021-01 to 2026-09), 11 of
   50 strict ESR tests reject at 5% before adjustment, 6 after Benjamini-Hochberg and 4 after
   Holm. All 6 BH rejections come with exceedance rates below the nominal level and one-sided
@@ -207,11 +218,12 @@ The `iid-t5` cells look the same (Kupiec 10.1% at n = 250, 1%, 7.3% at n = 250, 
   tests with few exceedances (the Christoffersen and DQ distortions with rare hits are
   known from the literature), not implementation failures; the closed-form checks in
   section 2 pin down the statistics themselves.
-- **Strict ESR.** Close to nominal or slightly oversized; with 200 replications the data
-  cannot distinguish 5% from 8%. The esback G2'' variant rejects slightly more often in the
-  same replications (6.0-9.0% against 5.5-8.0%; its n = 1000 interval, 5.8-13.8%, excludes 5%
-  while the correct-G2'' interval, 5.0-12.6%, just reaches it): the esreg bug changes
-  individual p-values (section 2.2) more than the rejection rate.
+- **Strict ESR.** Close to nominal or slightly oversized; with 200 replications the data cannot
+  distinguish 5% from 8% (the full profile can: oversized for n <= 2000, section 3.0). The
+  esback G2'' variant rejects slightly more often in the same replications (6.0-9.0% against
+  5.5-8.0%; its n = 1000 interval, 5.8-13.8%, excludes 5% while the correct-G2'' interval,
+  5.0-12.6%, just reaches it): the esreg bug changes individual p-values (section 2.2) more than
+  the rejection rate.
 - **ESR v3** is conservative: under the null the 5% quantile of its p-value is 0.10-0.18
   and its median 0.56-0.65. A separate null study (`scripts/esr_v3_null_se.py`, 200
   replications of `garch-t5`, n = 1000, alpha = 2.5%; `results/mc-quick/esr_v3_null_se.json`)
@@ -255,6 +267,71 @@ detect a wrong tail shape at a correct VaR (where VaR tests have no power by con
 and DQ is best against unconditional forecasts. At these sample sizes the ESR tests are
 less powerful than Z2 against understated scale and than Z1/McNeil-Frey against wrong tail
 shape, but they need no predictive distribution and no volatility input.
+
+### 3.0 Full profile (`configs/mc_full.toml`)
+
+Run 2026-11-13 on a Linux machine at tailcheck 0.1.0 (Python 3.13.18; numpy, scipy, pandas
+and arch as in section 1; config hash `3de88eab00578b69`, seed 20261023): 12,680 of 12,680
+units, no unit failed (McNeil-Frey was undefined in 24,673 replications and Z1 in 3,235, for
+too few exceedances; as in the quick run these count as non-rejections), 6.4 hours of wall time and 19.1 CPU-hours by the unit timings in the run
+log (ESR 17.4, everything else 1.7; `results/mc-full/timing.json`, from
+`scripts/mc_timing.py`). The 2026-10-24 re-timing projected 55-105 CPU-hours
+before two DGPs were dropped from the ESR block (`configs/mc_full.toml` header); the measured
+cost is well below that. Report: `tailcheck mc report --config configs/mc_full.toml`;
+`results/mc-full/` (`size_power.md` with Wilson intervals, `size_power.csv` with the
+chunk-clustered intervals, `summary.json`). 815 cells and 4,036,400 replications: the VaR/ES
+tests at n = 250-5000 and alpha = 1%, 2.5% and 5% on three null DGPs (`garch-t5`, `iid-t5`,
+`iid-normal`; 10,000 replications per size cell, 2,000 per power cell), the ESR tests at
+n = 500-5000 and alpha = 1% and 2.5% on `garch-t5` (1,000 per size cell, 300 per power cell).
+
+**ESR size** (`garch-t5`, true forecasts; rejection rate at 5%, 95% Wilson interval):
+
+| test | alpha | n = 500 | n = 1000 | n = 2000 | n = 5000 |
+|---|---|---|---|---|---|
+| strict ESR (v1) | 1% | 0.117 [0.099, 0.138] | 0.082 [0.067, 0.101] | 0.068 [0.054, 0.085] | 0.041 [0.030, 0.055] |
+| strict ESR (v1) | 2.5% | 0.086 [0.070, 0.105] | 0.068 [0.054, 0.085] | 0.069 [0.055, 0.086] | 0.042 [0.031, 0.056] |
+| strict ESR, esback G2'' | 1% | 0.098 [0.081, 0.118] | 0.070 [0.056, 0.088] | 0.067 [0.053, 0.084] | 0.043 [0.032, 0.057] |
+| strict ESR, esback G2'' | 2.5% | 0.082 [0.067, 0.101] | 0.068 [0.054, 0.085] | 0.066 [0.052, 0.083] | 0.040 [0.030, 0.054] |
+| ESR v3 (one-sided) | 1% | 0.003 [0.001, 0.009] | 0.001 [0.000, 0.006] | 0.004 [0.002, 0.010] | 0.008 [0.004, 0.016] |
+| ESR v3 (one-sided) | 2.5% | 0.000 [0, 0.004] | 0.006 [0.003, 0.013] | 0.008 [0.004, 0.016] | 0.022 [0.015, 0.033] |
+
+The auxiliary ESR test (v2) has the same rejection rate as v1 in every size cell (its statistic
+differs from v1's only in the third decimal on the example data).
+
+**Where the quick-profile conclusions change.**
+
+- **Strict ESR is oversized below n = 5000.** The quick run (200 replications) said "close to
+  nominal or slightly oversized; cannot distinguish 5% from 8%", with every interval reaching
+  5%. With 1,000 replications 6 of the 8 v1 cells exclude 5%, all on the high side, worst at
+  small n and alpha = 1% (11.7%). At n = 5000 both levels are near nominal. This agrees with
+  the bootstrap study's asymptotic 7.3% at n = 1000, alpha = 2.5% (section 3.1), which it
+  extends to alpha = 1% and n = 500. The esreg-G2'' variant is slightly less oversized at
+  n = 500-1000, alpha = 1% (9.8% and 7.0%) and otherwise within 0.4 points of the correct
+  formula, so the oversizing is not caused by the G2'' correction.
+- **ESR v3 is conservative at every n measured.** Quick: 0-1% at n = 1000-2000. Full: 0-2.2%;
+  even at n = 5000, alpha = 2.5% the interval (1.5-3.3%) stays below 5%. The SE asymmetry of
+  section 3 does not vanish at the sample sizes used in practice.
+- **ESR power.** At 2.5% and n = 1000/2000, v3 rejects 0.35/0.77 (`scale-0.85`) and 0.30/0.71
+  (`normal-tails`), v1 0.19/0.57 and 0.18/0.54; quick-run figures (40 replications) were
+  0.40/0.73, 0.30/0.63, 0.20/0.45 and 0.15/0.53. The ranking (v3 above v1 despite v3's
+  conservative size) holds. At n = 5000 both reach 0.98-0.99 at 2.5%. At alpha = 1%,
+  `scale-0.85`, n = 1000 the strict test rejects 3.3% (below its own null rate of 8.2%): it is
+  not unbiased there.
+- **VaR and ES tests: same pattern, now pinned down.** Over 45 size cells per test, Z2 covers 5%
+  in all 45 (4.6-5.4%) and Z1 in 43 (4.5-5.5%). Kupiec is 4.0-9.8%, oversized at n = 250
+  (5.6-9.8%; 7.3-9.8% at alpha <= 2.5%) and still excluding 5% in 13 of 27 cells with n >= 1000
+  (discreteness). DQ is oversized at alpha = 1% at every n, including n = 5000 (7.4-7.9%), up to
+  17.9% (`iid-t5`, n = 500, 1%). Christoffersen independence is undersized at alpha = 1% in all
+  15 cells (1.2-1.9%) and at 2.5% up to n = 2000 (1.4-2.7%), but at 2.5% and n = 5000 it is
+  oversized (6.5-7.1%; `iid-normal` 7.1% [6.6, 7.6], `garch-t5` 6.8% [6.3, 7.3], `iid-t5` 6.5%
+  [6.0, 7.0]). At 5% it is undersized at n <= 500 (1.6-3.4%) and oversized at n = 1000
+  (8.1-8.6%) and in some larger cells, so "undersized everywhere" holds only for alpha = 1%.
+  McNeil-Frey is below 5% almost everywhere (0.9-5.1%; 38 of 45 intervals exclude 5%). Under the
+  lenient [3%, 7%] rule 84 of 347 size cells are distorted; 212 of 347 exclude 5%.
+- **Acerbi-Szekely design effect.** Over the 45 size cells per test the mean chunk-clustered
+  design effect is 1.00 (Z1) and 1.02 (Z2), against 0.99-1.05 for the VaR tests and
+  McNeil-Frey (Kupiec, Christoffersen ind and cc, DQ), whose replications share nothing; the
+  per-chunk null sample still does not widen the intervals.
 
 ### 3.1 Bootstrap ESR tests and esback on null data (follow-up)
 
@@ -508,13 +585,13 @@ Per-regime tests (Kupiec, strict ESR, ESR v3, FZ0, Acerbi-Szekely) are in
 - **Few exceedances.** At 1% the equity series have 6 to 26 exceedances. ESR, McNeil-Frey and
   Acerbi-Szekely have little power there, and the ESR asymptotics are least reliable
   (section 3).
-- **Quick profile only.** Parameters are refit every 21 days, the study's ESR p-values are
-  asymptotic (no bootstrap), and the main Monte Carlo uses 200 replications per ESR size
-  cell, enough to detect only gross size distortions (Wilson half-width about 0.03 at a 5%
-  rate). The bootstrap ESR study (section 3.1) covers one level (2.5%), one null DGP and
-  n = 1000/2000; given its result, the study's v3 column understates evidence against the
-  forecasts and its strict-ESR column may slightly overstate it. The full-size
-  configurations were not run.
+- **Study at the quick profile.** Parameters are refit every 21 days and the study's ESR
+  p-values are asymptotic (no bootstrap); `configs/study_full.toml` was not run. The
+  full-profile Monte Carlo (section 3.0; 1,000 replications per ESR size cell, one null DGP,
+  `garch-t5`) shows the asymptotic strict ESR test oversized at the study's sample sizes
+  (n = 1,400-2,100: about 7-8% at 5%), so the study's strict-ESR column overstates evidence
+  against the forecasts somewhat, and its v3 column understates it. The bootstrap ESR study
+  (section 3.1) covers one level (2.5%), one null DGP and n = 1000/2000.
 - **One sample period.** 2021-2026 contains several stress episodes but is one realisation;
   the results are not a general ranking of the forecasters.
 - **Data revisions.** FRED serves only the most recent 10 years of SP500, so a rerun after
@@ -531,13 +608,12 @@ Per-regime tests (Kupiec, strict ESR, ESR v3, FZ0, Acerbi-Szekely) are in
   cuts to the ESR replication counts at calibration time, when an ESR fit with the default
   covariance took 2-4 s at n = 2000 (partly BLAS oversubscription, since fixed); see
   section 3.
-- **Full-size profiles** are projected, not measured. A re-timing of sampled units on
-  2026-10-24 (`scripts/retime_full.py`, `results/retime-full.json`) measured 59 CPU-hours for
-  `configs/study_full.toml` (ESR bootstrap 50, at 0.8-1.6 s per resample) and 145 for
-  `configs/mc_full.toml`, on a machine that was heavily loaded by other jobs: a reference fit
-  took 1.4-2.6 times as long as on a quieter machine. Scaled by that factor the estimates are
-  roughly 23-42 and 55-105 CPU-hours; the original projections (20-30 and 35-45) were too low
-  for the Monte Carlo profile.
+- **Full-size profiles.** `configs/mc_full.toml` was run (section 3.0): 19.1 CPU-hours on a
+  Linux machine, well below the 55-105 projected from the 2026-10-24 re-timing
+  (`scripts/retime_full.py`, `results/retime-full.json`, on a heavily loaded Windows machine
+  and before two ESR DGPs were dropped). `configs/study_full.toml` remains projected only (59
+  CPU-hours as re-timed, roughly 23-42 on a quiet machine; ESR bootstrap 50 of them, at
+  0.8-1.6 s per resample).
 
 ## 6. Reproduce
 
@@ -548,6 +624,9 @@ uv run tailcheck study run    --config configs/study.toml --workers 4
 uv run tailcheck study report --config configs/study.toml
 uv run tailcheck mc run       --config configs/mc_quick.toml --workers 4
 uv run tailcheck mc report    --config configs/mc_quick.toml
+# section 3.0 (about 19 CPU-hours; resumable)
+uv run tailcheck mc run       --config configs/mc_full.toml --workers 4
+uv run tailcheck mc report    --config configs/mc_full.toml
 # section 3.1 (about 5 CPU-hours; sessions of at most --max-minutes, rerun to resume)
 uv run tailcheck mc boot-run    --config configs/mc_esr_boot.toml --workers 3 --max-minutes 36
 uv run tailcheck mc boot-report --config configs/mc_esr_boot.toml

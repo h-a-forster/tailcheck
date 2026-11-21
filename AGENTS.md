@@ -2,7 +2,7 @@
 
 Guide for coding agents (and humans) working on tailcheck. Read `docs/DESIGN.md` before
 changing any statistics. It holds the formulas, reference values and milestones this file
-points to. Open work lives in `backlog.md`.
+points to.
 
 ## What this is
 
@@ -31,7 +31,7 @@ and equity indices.
 - `esreg`/`esback` are GPL-3. Implement from the papers; use the R packages only as
   black-box oracles through `scripts/r_fixtures/` (webR). Do not translate their source.
 - Scratch files go in `tmp/` (gitignored). Do not create `.bak` copies; use git.
-- The repository is public on GitHub; pushes, tags and releases are done by the owner
+- The repository is public on GitHub; pushes, tags and releases are done by the maintainer
   after review.
 - Statistical honesty: report sizes, seeds, versions and intervals; adjust for multiple
   testing where DESIGN says so; never overstate. Before calling anything a library bug,
@@ -59,6 +59,7 @@ and equity indices.
 | `scripts/r_fixtures/` | webR runner (`run_r.mjs`), R fixture scripts and repros | M4 |
 | `scripts/esback_null/` | esback asymptotic ESR on simulated null data (webR) vs tailcheck | DESIGN 6.1 |
 | `scripts/retime_full.py` | re-time samples of the full-size profiles | - |
+| `scripts/mc_timing.py` | CPU/wall hours of a run from its `progress.log` (`results/mc-full/timing.json`) | - |
 | `tests/fixtures/r/` | committed R inputs (CSV) and outputs (JSON) | M4 |
 
 ## How to test
@@ -109,7 +110,7 @@ small sample, wrap it in a resume-on-failure loop keyed on exit code 3, and watc
 
 ## Status and next steps
 
-Updated: 2026-11-07.
+Updated: 2026-11-21.
 
 Done:
 - Scaffold, `docs/DESIGN.md`, research checks (FRED instead of Stooq; Binance ms->us
@@ -167,7 +168,7 @@ Done:
 - Tests: see the latest commit message for counts (`uv run pytest`; `--runslow` also
   runs the slow Monte Carlo and R-fixture checks; 2 documented skips: iid sparsity vs
   esreg).
-- Round 2 (2026-10-24):
+- Follow-up studies (2026-10-24):
   - Bootstrap ESR size/power study (`montecarlo/esr_boot.py`, `configs/mc_esr_boot.toml`,
     `tailcheck mc boot-run|boot-report`, `results/mc-esr-boot/`, REPORT 3.1). 2,320
     replications, 305 CPU-min, four resumed sessions (`--max-minutes 36`). Bootstrap v3 size
@@ -184,8 +185,14 @@ Done:
     loaded machine: mc_full 145 CPU-hours as measured, study_full 59; a reference fit was
     1.4-2.6x slower than on a quieter machine, so roughly 55-105 and 23-42 idle. The 0.1.0
     projections (35-45, 20-30) were too low for mc_full. Re-time on an idle machine.
+- mc_full (run 2026-11-13 on Linux, reported 2026-11-21): 12,680/12,680 units, 19.1 CPU-hours
+  (ESR 17.4), 6.4 h wall (`results/mc-full/timing.json`); `results/mc-full/`, REPORT 3.0.
+  Asymptotic strict ESR oversized for
+  n <= 2000 (6.8-11.7%), near nominal at n = 5000; v3 0-2.2%. On Windows the first open of
+  each freshly extracted unit file can cost ~0.5 s (on-access scan), so `mc report` on a new
+  copy of the run directory can take hours; reading the files once in parallel first avoids it.
 
-- Round 3 (2026-10-24), second audit fixed: partial runs looked finished (run commands
+- Second audit (2026-10-24) fixed: partial runs looked finished (run commands
   now print done/expected and exit 3 when incomplete; reports refuse partial runs unless
   `--allow-partial` and record `complete`); `[run] workers` no longer in the config hash
   (old-hash runs still resume); sdist ships `examples/` and `REPORT.md`; Christoffersen

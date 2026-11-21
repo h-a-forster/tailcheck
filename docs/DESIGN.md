@@ -502,7 +502,8 @@ expected, not a bug.
 
 **Profiles.** `configs/mc_quick.toml` (default; at most 45 CPU-minutes, about 12 minutes on 4
 workers) and `configs/mc_full.toml` (re-timed at roughly 55-105 CPU-hours before its ESR cells were
-reduced; see its header). Estimated quick budget:
+reduced; run 2026-11-13 in 19.1 CPU-hours, see its header and REPORT 3.0).
+Estimated quick budget:
 ESR about 2,300 fits at about 1 s (Nelder-Mead ILS plus 4 LPs measured at about 1.3 s for
 n = 2000 at scaffold time); cheap tests about 120 s, since all cheap tests share each
 replication (the AS null was planned once per cell; it is now drawn once per chunk, see
@@ -587,7 +588,7 @@ Layers, each in `tests/`:
        scale-0.85, normal-tails; n = 1500, alpha = 0.025 and 0.01);
    (f) `er_backtest` with B = 20,000.
    Also record R and package versions in `outputs/r_versions.json`.
-   Tolerances (tightened in round 3 to about 2.5x the observed agreement): QR coefficients
+   Tolerances (tightened on 2026-10-24 to about 2.5x the observed agreement): QR coefficients
    1e-10. vcov at R's coefficients: 1e-5 relative for scl_N, 1e-2 for scl_sp (KDE binning
    differs), with misspec=TRUE expected to differ only through the G2'' term (iid sparsity
    is skipped, see section 12). esreg fit: our loss <= R loss + 1e-7 and coefficients within
